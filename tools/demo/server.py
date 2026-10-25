@@ -3,14 +3,26 @@ import json, os, re, sys, hashlib
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, os.path.dirname(__file__))
-from data import MOVIES, SHOWS, GENRES, PEOPLE
+from data import MOVIES, SHOWS, GENRES, PEOPLE, EN, GENRES_EN, PEOPLE_EN, ROLES_EN, EPISODES_EN
 
-IMG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "img")
-GN = {k: dict(v) for k, v in GENRES.items()}
+ENG = os.environ.get("DEMO_LANG") == "en"  # English titles, texts and artwork
+
+IMG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "img-en" if ENG else "img")
+GN = {k: {i: GENRES_EN.get(i, n) if ENG else n for i, n in v} for k, v in GENRES.items()}
+
+
+def pname(p):
+    return PEOPLE_EN[p[0]][0] if ENG else p[1]
+
+
+def title(t):
+    return t[2] if ENG else t[1]
 
 
 def item(t, kind, media=False):
     id, ru, orig, year, _, _, _, genres, rating, tag, ov = t[:11]
+    if ENG:
+        ru, (tag, ov) = orig, EN[id]
     d = {"id": id, "poster_path": f"/p{id}.jpg", "backdrop_path": f"/b{id}.jpg", "overview": ov,
          "vote_average": rating, "vote_count": 1200 + id * 7, "genre_ids": genres, "popularity": 100 - id % 100}
     if kind == "movie":
@@ -35,9 +47,9 @@ def cast_for(id):
     people = rot(PEOPLE, id)
     actors = [p for p in people if p[4] == "Acting"][:7]
     directors = [p for p in people if p[4] == "Directing"][:1]
-    roles = ["Вера", "Андрей", "Капитан Лесков", "Марина", "Старик", "Соня", "Голос по радио"]
-    cast = [{"id": p[0], "name": p[1], "character": roles[i], "profile_path": f"/h{p[0]}.jpg", "order": i} for i, p in enumerate(actors)]
-    crew = [{"id": p[0], "name": p[1], "job": "Director", "department": "Directing", "profile_path": f"/h{p[0]}.jpg"} for p in directors]
+    roles = ROLES_EN if ENG else ["Вера", "Андрей", "Капитан Лесков", "Марина", "Старик", "Соня", "Голос по радио"]
+    cast = [{"id": p[0], "name": pname(p), "character": roles[i], "profile_path": f"/h{p[0]}.jpg", "order": i} for i, p in enumerate(actors)]
+    crew = [{"id": p[0], "name": pname(p), "job": "Director", "department": "Directing", "profile_path": f"/h{p[0]}.jpg"} for p in directors]
     return cast, crew
 
 
@@ -48,10 +60,10 @@ def details(kind, id):
         return None
     d = item(t, kind)
     d["genres"] = [{"id": g, "name": GN[kind].get(g, GN["movie"].get(g, "драма"))} for g in t[7]]
-    d["tagline"] = t[9]
+    d["tagline"] = EN[id][0] if ENG else t[9]
     cast, crew = cast_for(id)
     d["credits"] = {"cast": cast, "crew": crew}
-    d["production_countries"] = [{"name": "Россия"}]
+    d["production_countries"] = [{"name": "Russia" if ENG else "Россия"}]
     d["external_ids"] = {"imdb_id": ""}
     d["videos"] = {"results": []}
     d["recommendations"] = page([item(x, kind) for x in rot(src, id)[1:9]])
@@ -61,7 +73,7 @@ def details(kind, id):
     else:
         d["episode_run_time"] = [45]
         d["content_ratings"] = {"results": [{"iso_3166_1": "RU", "rating": "16+"}]}
-        d["seasons"] = [{"season_number": n, "name": f"Сезон {n}", "episode_count": 8, "air_date": f"{t[3] + n - 1}-03-01"} for n in range(1, t[11] + 1)]
+        d["seasons"] = [{"season_number": n, "name": f"Season {n}" if ENG else f"Сезон {n}", "episode_count": 8, "air_date": f"{t[3] + n - 1}-03-01"} for n in range(1, t[11] + 1)]
         d["number_of_seasons"] = t[11]
     return d
 
@@ -80,8 +92,9 @@ def person(id):
             for x in cr:
                 if x["id"] == id:
                     crew.append({**item(t, kind, True), "job": "Director", "department": "Directing"})
-    return {"id": id, "name": p[1], "profile_path": f"/h{id}.jpg", "biography": p[5], "birthday": p[6], "deathday": None,
-            "place_of_birth": p[7], "known_for_department": p[4], "gender": 1 if p[2] else 2, "imdb_id": "",
+    name, bio, place = PEOPLE_EN[id] if ENG else (p[1], p[5], p[7])
+    return {"id": id, "name": name, "profile_path": f"/h{id}.jpg", "biography": bio, "birthday": p[6], "deathday": None,
+            "place_of_birth": place, "known_for_department": p[4], "gender": 1 if p[2] else 2, "imdb_id": "",
             "combined_credits": {"cast": cast, "crew": crew}}
 
 
@@ -92,6 +105,8 @@ def match(t, q):
 
 TORRENTS = ["{ru} / {orig} ({y}) WEB-DL 2160p HDR | Дубляж", "{ru} / {orig} ({y}) WEB-DL 1080p | Дубляж, Original",
             "{ru} / {orig} ({y}) BDRip 1080p | MVO", "{ru} / {orig} ({y}) WEB-DLRip 720p | Дубляж"]
+TORRENTS_EN = ["{orig} ({y}) 2160p WEB-DL HDR DDP5.1", "{orig} ({y}) 1080p WEB-DL DDP5.1 ENG",
+               "{orig} ({y}) 1080p BluRay x264 ENG", "{orig} ({y}) 720p WEBRip ENG"]
 
 
 class H(BaseHTTPRequestHandler):
@@ -131,10 +146,10 @@ class H(BaseHTTPRequestHandler):
             "/movie/upcoming": page(rot(movies, 11)),
             "/trending/tv/week": page(shows), "/tv/popular": page(rot(shows, 2)), "/tv/top_rated": page(sorted(shows, key=lambda x: -x["vote_average"])),
             "/tv/on_the_air": page(rot(shows, 4)), "/tv/airing_today": page(rot(shows, 5)),
-            "/genre/movie/list": {"genres": [{"id": i, "name": n} for i, n in GENRES["movie"]]},
-            "/genre/tv/list": {"genres": [{"id": i, "name": n} for i, n in GENRES["tv"]]},
-            "/person/popular": page([{"id": x[0], "name": x[1], "profile_path": f"/h{x[0]}.jpg", "known_for_department": x[4],
-                                      "known_for": [{"title": MOVIES[i % len(MOVIES)][1]} for i in range(x[0], x[0] + 2)]} for x in PEOPLE]),
+            "/genre/movie/list": {"genres": [{"id": i, "name": n} for i, n in GN["movie"].items()]},
+            "/genre/tv/list": {"genres": [{"id": i, "name": n} for i, n in GN["tv"].items()]},
+            "/person/popular": page([{"id": x[0], "name": pname(x), "profile_path": f"/h{x[0]}.jpg", "known_for_department": x[4],
+                                      "known_for": [{"title": title(MOVIES[i % len(MOVIES)])} for i in range(x[0], x[0] + 2)]} for x in PEOPLE]),
         }
         if p in lists:
             return self.send(200, lists[p])
@@ -154,12 +169,13 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, page([item(t, kind) for t in src if match(t, s)]))
         if p == "/search/person":
             s = q.get("query", "").lower()
-            return self.send(200, page([{"id": x[0], "name": x[1], "profile_path": f"/h{x[0]}.jpg", "known_for_department": x[4], "known_for": []} for x in PEOPLE if s in x[1].lower()]))
+            return self.send(200, page([{"id": x[0], "name": pname(x), "profile_path": f"/h{x[0]}.jpg", "known_for_department": x[4], "known_for": []} for x in PEOPLE if s in pname(x).lower()]))
         m = re.match(r"^/tv/(\d+)/season/(\d+)/episode/(\d+)$", p)
         if m:
             e = int(m.group(3))
-            names = ["Пилот", "Сигнал", "Вторая смена", "Белая ночь", "Тихий час", "Точка невозврата", "Буря", "Рассвет"]
-            return self.send(200, {"name": names[(e - 1) % 8], "overview": "Новая серия: герои оказываются ближе к разгадке, чем думали.",
+            names = EPISODES_EN if ENG else ["Пилот", "Сигнал", "Вторая смена", "Белая ночь", "Тихий час", "Точка невозврата", "Буря", "Рассвет"]
+            ov = "The heroes get closer to the answer than they thought." if ENG else "Новая серия: герои оказываются ближе к разгадке, чем думали."
+            return self.send(200, {"name": names[(e - 1) % 8], "overview": ov,
                                    "still_path": f"/b{m.group(1)}.jpg", "vote_average": 8.0, "runtime": 45})
         m = re.match(r"^/(movie|tv|person)/(\d+)$", p)
         if m:
@@ -172,7 +188,7 @@ class H(BaseHTTPRequestHandler):
         t = next((x for x in MOVIES + SHOWS if x[1].lower() in query.lower() or x[2].lower() in query.lower()), None)
         items = []
         if t:
-            for i, f in enumerate(TORRENTS):
+            for i, f in enumerate(TORRENTS_EN if ENG else TORRENTS):
                 title = f.format(ru=t[1], orig=t[2], y=t[3])
                 h = hashlib.sha1(title.encode()).hexdigest()
                 size = [21, 9, 12, 2][i] * 1024 ** 3 + 345 * 1024 ** 2
