@@ -143,13 +143,14 @@ type Engine struct {
 	items     map[string]*managed
 	vpnDown   bool
 	diskLow   bool
+	freeBytes int64 // free space in the download folder, -1 unknown
 	startErr  string
 	restartAt time.Time
 	stor      storage.ClientImplCloser
 }
 
 func New(s *store.Store, bus *events.Bus, dataDir, cacheDir string) *Engine {
-	return &Engine{Store: s, Bus: bus, DataDir: dataDir, CacheDir: cacheDir, items: map[string]*managed{}}
+	return &Engine{Store: s, Bus: bus, DataDir: dataDir, CacheDir: cacheDir, items: map[string]*managed{}, freeBytes: -1}
 }
 
 func (e *Engine) Settings() Settings {
@@ -728,6 +729,10 @@ func (e *Engine) checkDisk() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.diskLow = err == nil && st.MinFreeGB > 0 && free < uint64(st.MinFreeGB)<<30
+	e.freeBytes = -1
+	if err == nil {
+		e.freeBytes = int64(free)
+	}
 }
 
 func inSchedule(st Settings, now time.Time) bool {
@@ -904,7 +909,7 @@ type Info struct {
 	Size      int64      `json:"size"`
 	Done      int64      `json:"done"`
 	Progress  float64    `json:"progress"`
-	Status    string     `json:"status"` // meta | downloading | streaming | queued | paused | seeding | done | error | stopped
+	Status    string     `json:"status"` // meta | downloading | streaming | waiting | queued | scheduled | nospace | paused | seeding | done | error
 	Mode      string     `json:"mode"`
 	Keep      bool       `json:"keep"`
 	Down      float64    `json:"down"` // bytes/s
@@ -1024,27 +1029,50 @@ func (e *Engine) infoLocked(m *managed, withFiles bool) Info {
 	if m.down > 1024 && info.Size > info.Done {
 		info.ETA = int64(float64(info.Size-info.Done) / m.down)
 	}
+	left := info.Size - info.Done
 	switch {
 	case m.row.Paused:
 		info.Status = "paused"
+	// Checked before an open player: step() stops all downloads while the
+	// disk is low, and showing "streaming" then hid why nothing came in.
+	case e.diskLow && info.Progress < 1:
+		info.Status = "nospace"
+		info.Hint = e.diskHintLocked(left)
 	case len(m.streams) > 0:
 		info.Status = "streaming"
 	case info.Progress >= 1 && m.stopped:
 		info.Status = "done"
 	case info.Progress >= 1:
 		info.Status = "seeding"
-	case e.diskLow:
-		info.Status = "nospace"
 	case m.queued && !inSchedule(e.settings, time.Now()):
 		info.Status = "scheduled"
 	case m.queued:
 		info.Status = "queued"
-	case m.row.Mode == "stream":
-		info.Status = "streaming"
+	// Without a player and without "keep" no piece is wanted (see
+	// applyFilePriorities), so nothing downloads: say so instead of "streaming".
+	case m.row.Mode == "stream" && !m.row.Keep:
+		info.Status = "waiting"
+		info.ETA = -1
 	default:
 		info.Status = "downloading"
 	}
+	if info.Hint == "" && info.Progress < 1 && e.freeBytes >= 0 && left > e.freeBytes {
+		info.Hint = fmt.Sprintf("Не поместится на диск: осталось скачать %s, а свободно %s. Освободите место или выберите папку загрузок на другом диске.", gb(left), gb(e.freeBytes))
+	}
 	return info
+}
+
+// diskHintLocked explains a download stopped for lack of disk space.
+func (e *Engine) diskHintLocked(left int64) string {
+	h := fmt.Sprintf("На диске с папкой загрузок свободно %s, а загрузки останавливаются, когда остаётся меньше %d ГБ (Настройки → Торренты).", gb(max(e.freeBytes, 0)), e.settings.MinFreeGB)
+	if left > 0 {
+		h += fmt.Sprintf(" Этой раздаче нужно ещё %s.", gb(left))
+	}
+	return h + " Освободите место или выберите папку загрузок на другом диске."
+}
+
+func gb(b int64) string {
+	return fmt.Sprintf("%.1f ГБ", float64(b)/(1<<30))
 }
 
 // ---------- helpers ----------
