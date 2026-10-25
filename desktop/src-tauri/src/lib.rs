@@ -1,11 +1,15 @@
 //! Desktop shell for Rivo: starts the Go media server as a sidecar,
 //! shows its web UI in a native window, lives in the tray (so TVs keep
-//! streaming when the window is closed) and hands magnet links to the server.
+//! streaming when the window is closed), hands magnet links to the server and
+//! keeps itself up to date (see updates.rs).
+
+mod updates;
 
 use std::sync::Mutex;
 
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -51,6 +55,12 @@ fn open_magnet(app: &AppHandle, magnet: &str) {
 
 fn magnet_in<'a, I: IntoIterator<Item = &'a str>>(args: I) -> Option<String> {
     args.into_iter().find(|a| a.starts_with("magnet:")).map(|s| s.to_string())
+}
+
+pub(crate) fn stop_server(app: &AppHandle) {
+    if let Some(child) = app.state::<Server>().child.lock().unwrap().take() {
+        let _ = child.kill();
+    }
 }
 
 fn splash_error(app: &AppHandle, msg: &str) {
@@ -121,10 +131,14 @@ const EXTERNAL_LINKS_JS: &str = r#"
 })();
 "#;
 
-fn external_links<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+fn external_links() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     tauri::plugin::Builder::new("external-links")
         .js_init_script(EXTERNAL_LINKS_JS)
-        .on_navigation(|_webview, url| {
+        .on_navigation(|webview, url| {
+            if url.host_str() == Some(updates::LINK_HOST) {
+                updates::on_link(webview.app_handle(), url.path());
+                return false;
+            }
             let local = matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "tauri.localhost")) || !matches!(url.scheme(), "http" | "https");
             if !local {
                 #[allow(deprecated)]
@@ -148,7 +162,9 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Server::default())
+        .manage(updates::Updates::default())
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -169,9 +185,15 @@ pub fn run() {
             let open = MenuItem::with_id(app, "open", "Открыть Rivo", true, None::<&str>)?;
             let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
             let autostart = CheckMenuItem::with_id(app, "autostart", "Запускать вместе с Windows", true, autostart_on, None::<&str>)?;
+            let update = updates::tray_item(&handle)?;
+            let auto_update = CheckMenuItem::with_id(app, "auto-update", "Обновляться автоматически", true, updates::auto_enabled(&handle), None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &autostart, &PredefinedMenuItem::separator(app)?, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[&open, &autostart, &PredefinedMenuItem::separator(app)?, &update, &auto_update, &PredefinedMenuItem::separator(app)?, &quit],
+            )?;
             let autostart_item = autostart.clone();
+            let auto_update_item = auto_update.clone();
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().cloned().expect("icon"))
                 .tooltip("Rivo")
@@ -185,6 +207,11 @@ pub fn run() {
                         let _ = if on { al.disable() } else { al.enable() };
                         let _ = autostart_item.set_checked(al.is_enabled().unwrap_or(false));
                     }
+                    "update" => updates::on_tray(app),
+                    "auto-update" => {
+                        updates::set_auto(app, !updates::auto_enabled(app));
+                        let _ = auto_update_item.set_checked(updates::auto_enabled(app));
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -195,16 +222,23 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            if std::env::args().any(|a| a == "--minimized") {
+            let minimized = std::env::args().any(|a| a == "--minimized");
+            if minimized {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.hide();
                 }
             }
+            updates::spawn(handle.clone(), minimized);
 
             if let Err(e) = start_server(&handle) {
                 splash_error(&handle, &format!("Не удалось запустить медиасервер: {e}"));
             }
             Ok(())
+        })
+        .on_page_load(|webview, payload| {
+            if payload.event() == PageLoadEvent::Finished && webview.label() == "main" {
+                updates::on_page_load(webview.app_handle());
+            }
         })
         .on_window_event(|window, ev| {
             if let WindowEvent::CloseRequested { api, .. } = ev {
@@ -217,9 +251,7 @@ pub fn run() {
         .expect("error while building Rivo")
         .run(|app, ev| {
             if let RunEvent::Exit = ev {
-                if let Some(child) = app.state::<Server>().child.lock().unwrap().take() {
-                    let _ = child.kill();
-                }
+                stop_server(app);
             }
         });
 }
