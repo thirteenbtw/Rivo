@@ -117,6 +117,7 @@ type managed struct {
 	row       store.TorrentRow
 	prevRead  int64
 	lastData  time.Time // when data last came in
+	stalls    int       // request resets in a row without new data
 	prevWrite int64
 	down, up  float64
 	streams   map[*streamReader]struct{}
@@ -146,6 +147,7 @@ type Engine struct {
 	freeBytes int64 // free space in the download folder, -1 unknown
 	startErr  string
 	restartAt time.Time
+	dumpedAt  time.Time
 	stor      storage.ClientImplCloser
 }
 
@@ -771,6 +773,7 @@ func (e *Engine) step() {
 		read, written := s.BytesReadData.Int64(), s.BytesWrittenData.Int64()
 		if read > m.prevRead || m.lastData.IsZero() {
 			m.lastData = time.Now()
+			m.stalls = 0
 		}
 		m.down = smooth(m.down, float64(read-m.prevRead))
 		m.up = smooth(m.up, float64(written-m.prevWrite))
@@ -791,11 +794,18 @@ func (e *Engine) step() {
 		if allowDown && !complete {
 			m.t.AllowDataDownload()
 			// A request a peer silently dropped is never sent again, so the
-			// torrent hangs just short of done. Cancel and re-request.
-			if m.t.Info() != nil && s.ActivePeers > 0 && time.Since(m.lastData) > stallAfter {
-				m.t.DisallowDataDownload()
-				m.t.AllowDataDownload()
+			// torrent hangs just short of done. Cancel and re-request, backing
+			// off: a busy seeder may take minutes to serve a queued request,
+			// and cancelling every 30 s sent us to the back of its queue for
+			// good. Before the first byte there is nothing to unstick.
+			if m.t.Info() != nil && s.ActivePeers > 0 && time.Since(m.lastData) > stallAfter<<min(m.stalls, 4) {
+				if read > 0 {
+					m.t.DisallowDataDownload()
+					m.t.AllowDataDownload()
+				}
+				m.stalls++
 				m.lastData = time.Now()
+				e.dumpStatus()
 			}
 		} else {
 			m.t.DisallowDataDownload()
@@ -832,6 +842,24 @@ func (e *Engine) step() {
 			m.t.AllowDataUpload()
 		}
 	}
+}
+
+// dumpStatus writes the client's peer table (choked, interested, requests)
+// to logs/torrent-status.txt when a torrent with peers gets no data, so a
+// stall can be diagnosed from the user's machine. At most once a minute.
+func (e *Engine) dumpStatus() {
+	if time.Since(e.dumpedAt) < time.Minute || e.cl == nil {
+		return
+	}
+	e.dumpedAt = time.Now()
+	cl, path := e.cl, filepath.Join(e.DataDir, "logs", "torrent-status.txt")
+	go func() {
+		var b strings.Builder
+		fmt.Fprintf(&b, "%s\n\n", time.Now().Format(time.RFC3339))
+		cl.WriteStatus(&b)
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		_ = os.WriteFile(path, []byte(b.String()), 0o644)
+	}()
 }
 
 func smooth(prev, cur float64) float64 { return prev*0.6 + cur*0.4 }
