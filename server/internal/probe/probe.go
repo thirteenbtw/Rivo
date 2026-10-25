@@ -96,8 +96,12 @@ func (p *Prober) run(ctx context.Context, path string, f *store.File, timeout ti
 	f.Duration, _ = strconv.ParseFloat(r.Format.Duration, 64)
 	videoSeen := false
 	for _, s := range r.Streams {
-		lang := s.Tags["language"]
-		title := s.Tags["title"]
+		tags := map[string]string{}
+		for k, v := range s.Tags {
+			tags[strings.ToLower(k)] = strings.TrimSpace(v)
+		}
+		lang := tags["language"]
+		title := trackTitle(tags)
 		switch s.CodecType {
 		case "video":
 			if videoSeen || s.Disposition["attached_pic"] == 1 {
@@ -111,12 +115,31 @@ func (p *Prober) run(ctx context.Context, path string, f *store.File, timeout ti
 			}
 			f.HDR = hdrKind(s)
 		case "audio":
-			f.Audio = append(f.Audio, store.Track{Index: s.Index, Codec: s.CodecName, Lang: lang, Title: title, Channels: s.Channels, Default: s.Disposition["default"] == 1})
+			f.Audio = append(f.Audio, store.Track{Index: s.Index, Codec: s.CodecName, Lang: lang, Title: title, Channels: s.Channels, Default: s.Disposition["default"] == 1,
+				Comment: s.Disposition["comment"] == 1, Described: s.Disposition["visual_impaired"] == 1})
 		case "subtitle":
-			f.Subs = append(f.Subs, store.Track{Index: s.Index, Codec: s.CodecName, Lang: lang, Title: title, Default: s.Disposition["default"] == 1, Forced: s.Disposition["forced"] == 1})
+			f.Subs = append(f.Subs, store.Track{Index: s.Index, Codec: s.CodecName, Lang: lang, Title: title, Default: s.Disposition["default"] == 1, Forced: s.Disposition["forced"] == 1,
+				SDH: s.Disposition["hearing_impaired"] == 1})
 		}
 	}
 	return nil
+}
+
+// trackTitle is the name a release gave a track ("Дубляж, Пифагор", "SDH").
+// MKV keeps it in title; MP4 has only handler_name, which muxers fill with
+// their own boilerplate unless someone named the track.
+func trackTitle(tags map[string]string) string {
+	if t := tags["title"]; t != "" {
+		return t
+	}
+	h := tags["handler_name"]
+	l := strings.ToLower(h)
+	if h == "" || strings.Contains(l, "handler") || strings.HasPrefix(l, "core media") || strings.HasPrefix(l, "iso media") ||
+		strings.Contains(l, "mainconcept") || strings.Contains(l, "gpac") || strings.Contains(l, "l-smash") || strings.HasPrefix(l, "mp4") ||
+		strings.HasPrefix(l, "apple ") || strings.HasPrefix(l, "bento4") || strings.HasPrefix(l, "lavf") || l == "stereo" || l == "mono" || l == "surround" {
+		return ""
+	}
+	return h
 }
 
 func hdrKind(s ffStream) string {

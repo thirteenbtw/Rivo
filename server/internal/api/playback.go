@@ -184,6 +184,8 @@ func statusOf(d decision) string {
 type trackOut struct {
 	Index    int    `json:"index"`
 	Label    string `json:"label"`
+	Name     string `json:"name"`
+	Meta     string `json:"meta"`
 	Codec    string `json:"codec"`
 	Lang     string `json:"lang"`
 	Selected bool   `json:"selected"`
@@ -209,42 +211,6 @@ type playback struct {
 	Title    string     `json:"title"`
 	Info     string     `json:"info"`
 	External bool       `json:"external"`
-}
-
-func langLabel(t store.Track, i int, kind string) string {
-	names := map[string]string{"rus": "Русский", "ru": "Русский", "eng": "English", "en": "English", "ukr": "Українська", "jpn": "日本語", "ger": "Deutsch", "deu": "Deutsch", "fre": "Français", "fra": "Français", "spa": "Español", "ita": "Italiano", "kor": "한국어", "chi": "中文", "zho": "中文"}
-	l := names[strings.ToLower(t.Lang)]
-	if l == "" && t.Lang != "" && t.Lang != "und" {
-		l = strings.ToUpper(t.Lang)
-	}
-	if l == "" {
-		l = fmt.Sprintf("%s %d", kind, i+1)
-	}
-	if t.Title != "" && !strings.EqualFold(t.Title, l) {
-		l += " — " + t.Title
-	}
-	return l
-}
-
-func audioMeta(t store.Track) string {
-	ch := ""
-	switch t.Channels {
-	case 1:
-		ch = " 1.0"
-	case 2:
-		ch = " 2.0"
-	case 6:
-		ch = " 5.1"
-	case 8:
-		ch = " 7.1"
-	}
-	c := strings.ToUpper(t.Codec)
-	if c == "EAC3" {
-		c = "DD+"
-	} else if c == "AC3" {
-		c = "DD"
-	}
-	return c + ch
 }
 
 // playInfo decides direct play vs HLS for one file and returns URLs (FR-8).
@@ -329,7 +295,8 @@ func (s *Server) preparePlayback(ctx context.Context, f *store.File, input strin
 			a := a
 			audio = &a
 		}
-		pb.Audio = append(pb.Audio, trackOut{Index: a.Index, Label: langLabel(a, i, "Дорожка") + " · " + audioMeta(a), Codec: a.Codec, Lang: a.Lang, Selected: sel})
+		name, meta := audioLabel(a, i)
+		pb.Audio = append(pb.Audio, trackOut{Index: a.Index, Label: name + " · " + meta, Name: name, Meta: meta, Codec: a.Codec, Lang: a.Lang, Selected: sel})
 	}
 	if audio == nil && len(f.Audio) > 0 {
 		audio = &f.Audio[0]
@@ -393,12 +360,8 @@ func (s *Server) preparePlayback(ctx context.Context, f *store.File, input strin
 		}
 	}
 	for i, t := range f.Subs {
-		to := trackOut{Index: i, Label: langLabel(t, i, "Субтитры"), Codec: t.Codec, Lang: t.Lang, Selected: i == subIdx, Bitmap: transcode.IsBitmapSub(t.Codec), External: t.External != ""}
-		if t.External != "" {
-			to.Label += " · " + strings.ToUpper(t.Codec) + " · внешние"
-		} else {
-			to.Label += " · " + strings.ToUpper(strings.TrimSuffix(t.Codec, "_subtitle")) + " · встроенные"
-		}
+		name, meta := subLabel(t, i)
+		to := trackOut{Index: i, Label: name + " · " + meta, Name: name, Meta: meta, Codec: t.Codec, Lang: t.Lang, Selected: i == subIdx, Bitmap: transcode.IsBitmapSub(t.Codec), External: t.External != ""}
 		if !to.Bitmap {
 			to.URL = fmt.Sprintf("/api/files/%d/subs/%d", f.ID, i)
 			if pb.Mode == "hls" && pb.Offset > 0 {

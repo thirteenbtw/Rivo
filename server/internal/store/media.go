@@ -10,14 +10,17 @@ import (
 )
 
 type Track struct {
-	Index    int    `json:"index"` // stream index inside the file, or -1 for external
-	Codec    string `json:"codec"`
-	Lang     string `json:"lang"`
-	Title    string `json:"title"`
-	Channels int    `json:"channels,omitempty"`
-	Default  bool   `json:"default,omitempty"`
-	Forced   bool   `json:"forced,omitempty"`
-	External string `json:"external,omitempty"` // path of an external subtitle file
+	Index     int    `json:"index"` // stream index inside the file, or -1 for external
+	Codec     string `json:"codec"`
+	Lang      string `json:"lang"`
+	Title     string `json:"title"`
+	Channels  int    `json:"channels,omitempty"`
+	Default   bool   `json:"default,omitempty"`
+	Forced    bool   `json:"forced,omitempty"`
+	SDH       bool   `json:"sdh,omitempty"`       // subtitles for the deaf and hard of hearing
+	Comment   bool   `json:"comment,omitempty"`   // commentary
+	Described bool   `json:"described,omitempty"` // audio description for the blind
+	External  string `json:"external,omitempty"`  // path of an external subtitle file
 }
 
 type File struct {

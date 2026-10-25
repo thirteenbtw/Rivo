@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, fmtRuntime, fmtSize, fmtTime, type Compat, type Item, type Show, type Title } from '../api';
+import { api, fmtRuntime, fmtSize, fmtTime, type Compat, type Item, type Show, type Title, type Track } from '../api';
 import { useApp, useAsync } from '../state';
 import { t, tr } from '../i18n';
 import { Art, Backdrop, ambientFor, paletteFor } from '../components/Art';
@@ -207,13 +207,13 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
               <h2 className="h2" style={{ fontSize: 'calc(14px * var(--fs))' }}>{t('tracks')}</h2>
               <label className="fld">{t('audio')}
                 <select className="sel" value={audio ?? ''} onChange={(e) => setAudio(Number(e.target.value))}>
-                  {(file.audio || []).map((a, i) => <option key={a.index} value={a.index}>{trackName(a.lang, a.title, i)} — {codecName(a.codec)}{a.channels ? ' ' + channels(a.channels) : ''}</option>)}
+                  {(file.audio || []).map((a, i) => <option key={a.index} value={a.index}>{[...trackName(a, i), codecName(a.codec) + (a.channels ? ' ' + channels(a.channels) : ''), a.comment ? tr('комментарии', 'commentary') : ''].filter(Boolean).join(' · ')}</option>)}
                 </select>
               </label>
               <label className="fld">{t('subtitles')}
                 <select className="sel" value={sub} onChange={(e) => setSub(Number(e.target.value))}>
                   <option value={-1}>{t('off')}</option>
-                  {(file.subs || []).map((s, i) => <option key={i} value={i}>{trackName(s.lang, s.title, i)} — {s.codec.replace('_subtitle', '').toUpperCase()}, {s.external ? tr('внешние', 'external') : tr('встроенные', 'embedded')}</option>)}
+                  {(file.subs || []).map((s, i) => <option key={i} value={i}>{[...trackName(s, i), s.forced ? tr('только надписи', 'forced') : '', s.sdh ? tr('для глухих', 'SDH') : '', s.codec.replace('_subtitle', '').toUpperCase(), s.external ? tr('внешние', 'external') : tr('встроенные', 'embedded')].filter(Boolean).join(' · ')}</option>)}
                 </select>
               </label>
             </section>
@@ -254,10 +254,15 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
 }
 
 function initials(n: string) { return n.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase(); }
-const langNames: Record<string, string> = { rus: 'Русский', ru: 'Русский', eng: 'English', en: 'English', ukr: 'Українська', jpn: '日本語', ger: 'Deutsch', fre: 'Français', spa: 'Español' };
-function trackName(lang: string, title: string, i: number) {
-  const l = langNames[lang] || (lang && lang !== 'und' ? lang.toUpperCase() : `${tr('Дорожка', 'Track')} ${i + 1}`);
-  return title ? `${l} (${title})` : l;
+const langNames: Record<string, string> = { rus: 'Русский', ru: 'Русский', eng: 'English', en: 'English', ukr: 'Українська', uk: 'Українська', jpn: '日本語', ja: '日本語', kor: '한국어', chi: '中文', zho: '中文', ger: 'Deutsch', deu: 'Deutsch', fre: 'Français', fra: 'Français', spa: 'Español', ita: 'Italiano', por: 'Português', pol: 'Polski', tur: 'Türkçe', bel: 'Беларуская', kaz: 'Қазақша' };
+// The name the release gave a track leads ("Дубляж, Пифагор · Русский"),
+// a bare language otherwise, the track number when there is neither.
+function trackName(t: Track, i: number): string[] {
+  const code = (t.lang || '').toLowerCase();
+  const l = langNames[code] || (code && code !== 'und' ? code.toUpperCase() : '');
+  const title = (t.title || '').trim();
+  if (title && title.toLowerCase() !== l.toLowerCase() && langNames[title.toLowerCase()] !== l) return l && !title.toLowerCase().includes(l.toLowerCase()) ? [title, l] : [title];
+  return [l || `${tr('Дорожка', 'Track')} ${i + 1}`];
 }
 function codecName(c: string) { return ({ hevc: 'HEVC', h264: 'H.264', ac3: 'DD', eac3: 'DD+', dts: 'DTS', truehd: 'TrueHD', aac: 'AAC', av1: 'AV1', vp9: 'VP9', opus: 'Opus', flac: 'FLAC', mp3: 'MP3' } as Record<string, string>)[c] || c.toUpperCase(); }
 function channels(n: number) { return ({ 1: '1.0', 2: '2.0', 6: '5.1', 8: '7.1' } as Record<number, string>)[n] || `${n}ch`; }
