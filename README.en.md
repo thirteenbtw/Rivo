@@ -107,12 +107,14 @@ Up to five profiles with a PIN, their own theme and history. Light, dark and OLE
 
 ## Install
 
-1. Download the installer [**Rivo_0.1.0_x64-setup.exe**](https://github.com/thirteenbtw/Rivo/releases/latest) from the latest release.
+1. Download the installer [**Rivo_&lt;version&gt;_x64-setup.exe**](https://github.com/thirteenbtw/Rivo/releases/latest) from the latest release.
    The newest build from `main` is in [Actions](https://github.com/thirteenbtw/Rivo/actions/workflows/build.yml): the `Rivo-windows-installer` artifact of the latest green run (requires signing in to GitHub).
 2. Run the installer. It installs the server, the player and FFmpeg, and opens the port in the Windows firewall for private networks only.
 3. On first launch, pick your movie and show folders. Rivo does the rest.
 
-Rivo works only inside your local network and sends nothing anywhere. Its data lives in `%APPDATA%\HomeCinema` (the folder keeps the app's former name so that updating doesn't lose the library). If an old HomeCinema install is present, the installer removes it.
+Rivo works only inside your local network and sends nothing anywhere apart from the update check described below. Its data lives in `%APPDATA%\HomeCinema` (the folder keeps the app's former name so that updating doesn't lose the library). If an old HomeCinema install is present, the installer removes it.
+
+After that Rivo updates itself. Every few hours it asks GitHub whether a new release is out, downloads the signed installer in the background and offers to restart into it, with a card in the window and an item in the tray menu. When Rivo was started with Windows and sits in the tray, the update goes in right away. The signature is checked against a key built into the app, so a tampered installer is refused. The tray menu (in Russian for now) has «Обновляться автоматически» to turn the checks off and «Проверить обновления» to check on demand.
 
 The interface language is Russian by default; switch it to English in Settings → Access & language.
 
