@@ -117,6 +117,7 @@ type managed struct {
 	row       store.TorrentRow
 	prevRead  int64
 	lastData  time.Time // when data last came in
+	stalls    int       // request resets in a row without new data
 	prevWrite int64
 	down, up  float64
 	streams   map[*streamReader]struct{}
@@ -143,13 +144,15 @@ type Engine struct {
 	items     map[string]*managed
 	vpnDown   bool
 	diskLow   bool
+	freeBytes int64 // free space in the download folder, -1 unknown
 	startErr  string
 	restartAt time.Time
+	dumpedAt  time.Time
 	stor      storage.ClientImplCloser
 }
 
 func New(s *store.Store, bus *events.Bus, dataDir, cacheDir string) *Engine {
-	return &Engine{Store: s, Bus: bus, DataDir: dataDir, CacheDir: cacheDir, items: map[string]*managed{}}
+	return &Engine{Store: s, Bus: bus, DataDir: dataDir, CacheDir: cacheDir, items: map[string]*managed{}, freeBytes: -1}
 }
 
 func (e *Engine) Settings() Settings {
@@ -728,6 +731,10 @@ func (e *Engine) checkDisk() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.diskLow = err == nil && st.MinFreeGB > 0 && free < uint64(st.MinFreeGB)<<30
+	e.freeBytes = -1
+	if err == nil {
+		e.freeBytes = int64(free)
+	}
 }
 
 func inSchedule(st Settings, now time.Time) bool {
@@ -766,6 +773,7 @@ func (e *Engine) step() {
 		read, written := s.BytesReadData.Int64(), s.BytesWrittenData.Int64()
 		if read > m.prevRead || m.lastData.IsZero() {
 			m.lastData = time.Now()
+			m.stalls = 0
 		}
 		m.down = smooth(m.down, float64(read-m.prevRead))
 		m.up = smooth(m.up, float64(written-m.prevWrite))
@@ -786,11 +794,18 @@ func (e *Engine) step() {
 		if allowDown && !complete {
 			m.t.AllowDataDownload()
 			// A request a peer silently dropped is never sent again, so the
-			// torrent hangs just short of done. Cancel and re-request.
-			if m.t.Info() != nil && s.ActivePeers > 0 && time.Since(m.lastData) > stallAfter {
-				m.t.DisallowDataDownload()
-				m.t.AllowDataDownload()
+			// torrent hangs just short of done. Cancel and re-request, backing
+			// off: a busy seeder may take minutes to serve a queued request,
+			// and cancelling every 30 s sent us to the back of its queue for
+			// good. Before the first byte there is nothing to unstick.
+			if m.t.Info() != nil && s.ActivePeers > 0 && time.Since(m.lastData) > stallAfter<<min(m.stalls, 4) {
+				if read > 0 {
+					m.t.DisallowDataDownload()
+					m.t.AllowDataDownload()
+				}
+				m.stalls++
 				m.lastData = time.Now()
+				e.dumpStatus()
 			}
 		} else {
 			m.t.DisallowDataDownload()
@@ -827,6 +842,24 @@ func (e *Engine) step() {
 			m.t.AllowDataUpload()
 		}
 	}
+}
+
+// dumpStatus writes the client's peer table (choked, interested, requests)
+// to logs/torrent-status.txt when a torrent with peers gets no data, so a
+// stall can be diagnosed from the user's machine. At most once a minute.
+func (e *Engine) dumpStatus() {
+	if time.Since(e.dumpedAt) < time.Minute || e.cl == nil {
+		return
+	}
+	e.dumpedAt = time.Now()
+	cl, path := e.cl, filepath.Join(e.DataDir, "logs", "torrent-status.txt")
+	go func() {
+		var b strings.Builder
+		fmt.Fprintf(&b, "%s\n\n", time.Now().Format(time.RFC3339))
+		cl.WriteStatus(&b)
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		_ = os.WriteFile(path, []byte(b.String()), 0o644)
+	}()
 }
 
 func smooth(prev, cur float64) float64 { return prev*0.6 + cur*0.4 }
@@ -904,7 +937,7 @@ type Info struct {
 	Size      int64      `json:"size"`
 	Done      int64      `json:"done"`
 	Progress  float64    `json:"progress"`
-	Status    string     `json:"status"` // meta | downloading | streaming | queued | paused | seeding | done | error | stopped
+	Status    string     `json:"status"` // meta | downloading | streaming | waiting | queued | scheduled | nospace | paused | seeding | done | error
 	Mode      string     `json:"mode"`
 	Keep      bool       `json:"keep"`
 	Down      float64    `json:"down"` // bytes/s
@@ -1024,27 +1057,50 @@ func (e *Engine) infoLocked(m *managed, withFiles bool) Info {
 	if m.down > 1024 && info.Size > info.Done {
 		info.ETA = int64(float64(info.Size-info.Done) / m.down)
 	}
+	left := info.Size - info.Done
 	switch {
 	case m.row.Paused:
 		info.Status = "paused"
+	// Checked before an open player: step() stops all downloads while the
+	// disk is low, and showing "streaming" then hid why nothing came in.
+	case e.diskLow && info.Progress < 1:
+		info.Status = "nospace"
+		info.Hint = e.diskHintLocked(left)
 	case len(m.streams) > 0:
 		info.Status = "streaming"
 	case info.Progress >= 1 && m.stopped:
 		info.Status = "done"
 	case info.Progress >= 1:
 		info.Status = "seeding"
-	case e.diskLow:
-		info.Status = "nospace"
 	case m.queued && !inSchedule(e.settings, time.Now()):
 		info.Status = "scheduled"
 	case m.queued:
 		info.Status = "queued"
-	case m.row.Mode == "stream":
-		info.Status = "streaming"
+	// Without a player and without "keep" no piece is wanted (see
+	// applyFilePriorities), so nothing downloads: say so instead of "streaming".
+	case m.row.Mode == "stream" && !m.row.Keep:
+		info.Status = "waiting"
+		info.ETA = -1
 	default:
 		info.Status = "downloading"
 	}
+	if info.Hint == "" && info.Progress < 1 && e.freeBytes >= 0 && left > e.freeBytes {
+		info.Hint = fmt.Sprintf("Не поместится на диск: осталось скачать %s, а свободно %s. Освободите место или выберите папку загрузок на другом диске.", gb(left), gb(e.freeBytes))
+	}
 	return info
+}
+
+// diskHintLocked explains a download stopped for lack of disk space.
+func (e *Engine) diskHintLocked(left int64) string {
+	h := fmt.Sprintf("На диске с папкой загрузок свободно %s, а загрузки останавливаются, когда остаётся меньше %d ГБ (Настройки → Торренты).", gb(max(e.freeBytes, 0)), e.settings.MinFreeGB)
+	if left > 0 {
+		h += fmt.Sprintf(" Этой раздаче нужно ещё %s.", gb(left))
+	}
+	return h + " Освободите место или выберите папку загрузок на другом диске."
+}
+
+func gb(b int64) string {
+	return fmt.Sprintf("%.1f ГБ", float64(b)/(1<<30))
 }
 
 // ---------- helpers ----------

@@ -12,7 +12,7 @@ type Tab = 'active' | 'stream' | 'search' | 'done' | 'seeding';
 const statusLabel: Record<string, [string, string]> = {
   meta: ['Метаданные', 'Metadata'], paused: ['Пауза', 'Paused'], streaming: ['Стриминг', 'Streaming'], done: ['Готово', 'Done'],
   seeding: ['Раздаётся', 'Seeding'], nospace: ['Нет места', 'No space'], scheduled: ['По расписанию', 'Scheduled'],
-  queued: ['В очереди', 'Queued'], downloading: ['Загрузка', 'Downloading'], error: ['Ошибка', 'Error'],
+  queued: ['В очереди', 'Queued'], waiting: ['Ждёт плеера', 'Waiting for player'], downloading: ['Загрузка', 'Downloading'], error: ['Ошибка', 'Error'],
 };
 function statusColors(s: string): [string, string] {
   if (s === 'streaming') return ['var(--acc)', '#FFFFFF'];
@@ -190,7 +190,10 @@ export default function Torrents() {
                                 </div>
                               </td>
                             </tr>
-                            {r.status === 'meta' && r.hint && <tr style={{ background: isSel ? 'var(--soft)' : undefined }} onClick={() => setSel(r.hash)}><td className="td" colSpan={7} style={{ borderTop: 0, paddingTop: 0, fontSize: 'calc(12px * var(--fs))', color: 'var(--warn-fg)', lineHeight: 1.45 }}>{r.hint}</td></tr>}
+                            {(r.hint || r.status === 'waiting') && <tr style={{ background: isSel ? 'var(--soft)' : undefined }} onClick={() => setSel(r.hash)}><td className="td" colSpan={7} style={{ borderTop: 0, paddingTop: 0, fontSize: 'calc(12px * var(--fs))', color: 'var(--warn-fg)', lineHeight: 1.45 }}>
+                              {r.hint || tr('Раздача добавлена для просмотра: качаются только куски, которые читает открытый плеер. Сейчас плеер закрыт, поэтому загрузка стоит.', 'Added for watching: only the pieces an open player reads are downloaded. No player is open, so nothing downloads.')}
+                              {r.status === 'waiting' && <>{' '}<button className="btn btn-l sm" style={{ height: 26, padding: '0 10px', marginLeft: 6 }} onClick={(e) => { e.stopPropagation(); patch(r.hash, { mode: 'download' }); }}>{tr('Скачать целиком', 'Download fully')}</button></>}
+                            </td></tr>}
                             {open === r.hash && <tr><td className="td" colSpan={7}><Files hash={r.hash} onPlay={(i) => nav(`/play/torrent/${r.hash}?file=${i}`)} /></td></tr>}
                           </Fragment>
                         );
