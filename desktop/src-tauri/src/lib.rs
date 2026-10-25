@@ -2,21 +2,32 @@
 //! shows its web UI in a native window, lives in the tray (so TVs keep
 //! streaming when the window is closed) and hands magnet links to the server.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 #[derive(Default)]
 struct Server {
     child: Mutex<Option<CommandChild>>,
     base: Mutex<Option<String>>,
     pending_magnet: Mutex<Option<String>>,
+}
+
+#[derive(Default)]
+struct Updates {
+    busy: AtomicBool,
+    // "Later" silences the automatic prompt for that version until restart
+    skipped: Mutex<Option<String>>,
 }
 
 fn show_main(app: &AppHandle) {
@@ -102,6 +113,115 @@ fn start_server(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// Updates come from GitHub Releases (latest.json, signed in CI). The check
+// runs shortly after start and then every few hours; installing always asks
+// first, because it closes Rivo and would cut off a movie playing on a TV.
+const UPDATE_FIRST: Duration = Duration::from_secs(30);
+const UPDATE_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+
+fn info(app: &AppHandle, msg: &str) {
+    app.dialog().message(msg).title("Обновление Rivo").show(|_| {});
+}
+
+fn tray_tooltip(app: &AppHandle, text: &str) {
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_tooltip(Some(text));
+    }
+}
+
+fn spawn_update_checks(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(UPDATE_FIRST);
+        loop {
+            tauri::async_runtime::block_on(check_for_update(app.clone(), false));
+            std::thread::sleep(UPDATE_EVERY);
+        }
+    });
+}
+
+async fn check_for_update(app: AppHandle, manual: bool) {
+    if app.state::<Updates>().busy.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let found = match app.updater() {
+        Ok(u) => u.check().await,
+        Err(e) => Err(e),
+    };
+    match found {
+        Ok(Some(update)) => {
+            let skipped = app.state::<Updates>().skipped.lock().unwrap().clone();
+            if manual || skipped.as_deref() != Some(update.version.as_str()) {
+                ask_to_update(&app, update);
+                return; // busy until the person answers
+            }
+        }
+        Ok(None) if manual => info(&app, &format!("У вас последняя версия Rivo ({}).", app.package_info().version)),
+        Err(e) if manual => info(&app, &format!("Не удалось проверить обновления: {e}")),
+        _ => {}
+    }
+    app.state::<Updates>().busy.store(false, Ordering::SeqCst);
+}
+
+fn ask_to_update(app: &AppHandle, update: Update) {
+    let text = format!(
+        "Вышла новая версия Rivo {} (у вас {}).\n\nУстановить сейчас? Rivo закроется примерно на минуту и откроется снова. Настройки и библиотека сохранятся.",
+        update.version, update.current_version
+    );
+    let h = app.clone();
+    app.dialog()
+        .message(text)
+        .title("Обновление Rivo")
+        .buttons(MessageDialogButtons::OkCancelCustom("Обновить".into(), "Позже".into()))
+        .show(move |ok| {
+            if ok {
+                tauri::async_runtime::spawn(install_update(h, update));
+            } else {
+                *h.state::<Updates>().skipped.lock().unwrap() = Some(update.version.clone());
+                h.state::<Updates>().busy.store(false, Ordering::SeqCst);
+            }
+        });
+}
+
+async fn install_update(app: AppHandle, update: Update) {
+    let mut got = 0usize;
+    let progress = app.clone();
+    let bytes = update
+        .download(
+            move |chunk, total| {
+                got += chunk;
+                if let Some(total) = total.filter(|t| *t > 0) {
+                    tray_tooltip(&progress, &format!("Rivo — загрузка обновления {}%", got as u64 * 100 / total));
+                }
+            },
+            || {},
+        )
+        .await;
+    tray_tooltip(&app, "Rivo");
+    let bytes = match bytes {
+        Ok(b) => b,
+        Err(e) => {
+            info(&app, &format!("Не удалось скачать обновление: {e}"));
+            app.state::<Updates>().busy.store(false, Ordering::SeqCst);
+            return;
+        }
+    };
+    // The installer replaces rivo-server.exe, so the server has to let go of it.
+    if let Some(child) = app.state::<Server>().child.lock().unwrap().take() {
+        let _ = child.kill();
+    }
+    // On Windows this starts the installer and exits; it reopens Rivo when done.
+    if let Err(e) = update.install(bytes) {
+        info(&app, &format!("Не удалось установить обновление: {e}"));
+        app.state::<Updates>().busy.store(false, Ordering::SeqCst);
+        if let Err(e) = start_server(&app) {
+            splash_error(&app, &format!("Не удалось запустить медиасервер: {e}"));
+        }
+        return;
+    }
+    app.restart();
+}
+
 // External links (TMDB, IMDb…) open in the system browser. A link with
 // target="_blank" or window.open() asks the webview for a new window, which
 // the shell does not create, so the init script turns those into a plain
@@ -148,7 +268,10 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Server::default())
+        .manage(Updates::default())
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -169,8 +292,9 @@ pub fn run() {
             let open = MenuItem::with_id(app, "open", "Открыть Rivo", true, None::<&str>)?;
             let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
             let autostart = CheckMenuItem::with_id(app, "autostart", "Запускать вместе с Windows", true, autostart_on, None::<&str>)?;
+            let update = MenuItem::with_id(app, "update", "Проверить обновления", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &autostart, &PredefinedMenuItem::separator(app)?, &quit])?;
+            let menu = Menu::with_items(app, &[&open, &autostart, &update, &PredefinedMenuItem::separator(app)?, &quit])?;
             let autostart_item = autostart.clone();
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().cloned().expect("icon"))
@@ -184,6 +308,9 @@ pub fn run() {
                         let on = al.is_enabled().unwrap_or(false);
                         let _ = if on { al.disable() } else { al.enable() };
                         let _ = autostart_item.set_checked(al.is_enabled().unwrap_or(false));
+                    }
+                    "update" => {
+                        tauri::async_runtime::spawn(check_for_update(app.clone(), true));
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -204,6 +331,7 @@ pub fn run() {
             if let Err(e) = start_server(&handle) {
                 splash_error(&handle, &format!("Не удалось запустить медиасервер: {e}"));
             }
+            spawn_update_checks(&handle);
             Ok(())
         })
         .on_window_event(|window, ev| {

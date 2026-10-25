@@ -44,6 +44,30 @@ jobs:
       TRIPLE: x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
+
+      # Every push to main is a release that installed copies update to, so it
+      # needs a version above the last one: 0.1.<run number>. A v* tag sets the
+      # version itself. Pull requests build 0.1.0 and publish nothing.
+      - name: Version
+        shell: bash
+        env:
+          HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          RELEASE=false
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"; RELEASE=true
+          elif [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
+            VERSION="0.1.$GITHUB_RUN_NUMBER"; RELEASE=true
+          else
+            VERSION="0.1.0"
+          fi
+          if [[ "$RELEASE" == true && "$HAS_KEY" != true ]]; then
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set, so this build is not published as an update"
+            RELEASE=false
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE=$RELEASE" >> "$GITHUB_ENV"
+          echo "Version $VERSION, release $RELEASE"
       - uses: actions/setup-go@v5
         with:
           go-version-file: server/go.mod
@@ -66,8 +90,6 @@ jobs:
         working-directory: server
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          [[ "$GITHUB_REF" == refs/tags/* ]] || VERSION="0.1.0-${GITHUB_SHA::7}"
           mkdir -p ../desktop/src-tauri/binaries
           go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o ../desktop/src-tauri/binaries/rivo-server-$TRIPLE.exe ./cmd/homecinema
 
@@ -91,9 +113,36 @@ jobs:
 
       - name: Build installer
         working-directory: desktop
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           npm ci
-          npx tauri build
+          # an absolute Windows path, so the CLI finds it whatever folder it runs from
+          echo "{\"version\":\"$VERSION\",\"bundle\":{\"createUpdaterArtifacts\":$RELEASE}}" > release.json
+          npx tauri build --config "$(pwd -W)/release.json"
+
+      # What the app's updater reads: releases/latest/download/latest.json
+      - name: Update manifest
+        if: env.RELEASE == 'true'
+        shell: bash
+        run: |
+          NSIS=desktop/src-tauri/target/release/bundle/nsis
+          EXE="Rivo_${VERSION}_x64-setup.exe"
+          node -e '
+            const fs = require("fs");
+            const [dir, exe, version, repo] = process.argv.slice(1);
+            fs.writeFileSync(dir + "/latest.json", JSON.stringify({
+              version,
+              pub_date: new Date().toISOString(),
+              platforms: { "windows-x86_64": {
+                signature: fs.readFileSync(dir + "/" + exe + ".sig", "utf8"),
+                url: `https://github.com/${repo}/releases/download/v${version}/${exe}`,
+              } },
+            }, null, 2));
+          ' "$NSIS" "$EXE" "$VERSION" "$GITHUB_REPOSITORY"
+          cat "$NSIS/latest.json"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -101,8 +150,14 @@ jobs:
           path: desktop/src-tauri/target/release/bundle/nsis/*.exe
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: desktop/src-tauri/target/release/bundle/nsis/*.exe
+          tag_name: v${{ env.VERSION }}
+          name: Rivo ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/release/bundle/nsis/latest.json
           generate_release_notes: true
+          make_latest: true
