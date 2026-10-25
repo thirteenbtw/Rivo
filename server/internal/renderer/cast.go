@@ -13,28 +13,44 @@ import (
 	"github.com/thirteenbtw/homecinema/server/internal/store"
 )
 
-// DiscoverCast browses mDNS for _googlecast._tcp devices.
+// DiscoverCast browses mDNS for _googlecast._tcp devices. The regular
+// multicast browse needs inbound UDP 5353 open in the firewall; a legacy
+// unicast probe runs next to it and gets answers even when that is blocked.
 func DiscoverCast(ctx context.Context, timeout time.Duration) ([]store.Device, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	ch, err := dns.DiscoverCastDNSEntries(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
+	uni := make(chan []store.Device, 1)
+	go func() { uni <- probeCastUnicast(ctx) }()
+
 	seen := map[string]bool{}
 	var out []store.Device
-	for e := range ch {
-		if e.AddrV4 == nil || seen[e.UUID] {
-			continue
+	add := func(d store.Device) {
+		if d.ID == "" || seen[d.ID] {
+			return
 		}
-		seen[e.UUID] = true
-		name := e.DeviceName
-		if name == "" {
-			name = e.Device
-		}
-		out = append(out, store.Device{ID: e.UUID, Name: name, Model: e.Device, Proto: "cast", Addr: e.AddrV4.String(), Port: e.Port})
+		seen[d.ID] = true
+		out = append(out, d)
 	}
-	return out, nil
+	ch, err := dns.DiscoverCastDNSEntries(ctx, nil)
+	if err == nil {
+		for e := range ch {
+			if e.AddrV4 == nil {
+				continue
+			}
+			name := e.DeviceName
+			if name == "" {
+				name = e.Device
+			}
+			add(store.Device{ID: e.UUID, Name: name, Model: e.Device, Proto: "cast", Addr: e.AddrV4.String(), Port: e.Port})
+		}
+	}
+	for _, d := range <-uni {
+		add(d)
+	}
+	if len(out) > 0 {
+		err = nil
+	}
+	return out, err
 }
 
 type castRenderer struct {
