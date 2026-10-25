@@ -143,6 +143,28 @@ func (s *Server) deleteTorrent(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, map[string]bool{"ok": true})
 }
 
+// torrentDisk reports the files in the download folder no torrent owns.
+func (s *Server) torrentDisk(w http.ResponseWriter, r *http.Request) error {
+	return writeJSON(w, s.Torrents.Disk())
+}
+
+func (s *Server) torrentCleanup(w http.ResponseWriter, r *http.Request) error {
+	var b struct {
+		Library bool `json:"library"`
+	}
+	_ = readJSON(r, &b)
+	gone := map[string]bool{}
+	for _, p := range s.Torrents.CleanupPaths(b.Library) {
+		gone[p] = true
+	}
+	s.Trans.StopWhere(func(in string) bool { return gone[in] })
+	freed, failed := s.Torrents.Cleanup(b.Library)
+	if b.Library {
+		s.Scanner.RequestScan(0)
+	}
+	return writeJSON(w, map[string]any{"freed": freed, "failed": failed})
+}
+
 func (s *Server) torrentStream(w http.ResponseWriter, r *http.Request) error {
 	st, err := s.Torrents.Stream(r.PathValue("hash"), queryInt(r, "file", -1), queryInt(r, "cells", 200))
 	if err != nil {

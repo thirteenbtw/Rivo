@@ -536,8 +536,6 @@ func (e *Engine) SetFiles(hash string, off []int) error {
 	return e.Store.SaveTorrent(m.row)
 }
 
-// Remove drops a torrent; deleteData also removes the downloaded files (not
-// the copies already imported into the library).
 // Remove drops a torrent. deleteData also deletes its downloaded files, and
 // withLibrary the copies placed in the library (hard links of the same data, so
 // without them deleting the download frees no space).
@@ -592,7 +590,8 @@ func (e *Engine) dataPathsLocked(m *managed, withLibrary bool) (files, dirs []st
 	}
 	for _, f := range m.t.Files() {
 		src := filepath.Join(st.DownloadDir, filepath.FromSlash(f.Path()))
-		files = append(files, src, src+".hc-link")
+		// Unfinished files sit under a .part name until their last piece.
+		files = append(files, src, src+".part", src+".hc-link")
 		if !withLibrary || !parse.IsVideo(f.Path()) {
 			continue
 		}

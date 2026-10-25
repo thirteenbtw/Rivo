@@ -154,6 +154,8 @@ func (s *Server) routes(mux *http.ServeMux) {
 	h("GET /api/torrents", s.listTorrents)
 	h("POST /api/torrents", s.addTorrent)
 	h("GET /api/torrents/search", s.searchTorrents)
+	h("GET /api/torrents/disk", s.torrentDisk)
+	h("POST /api/torrents/cleanup", s.torrentCleanup)
 	h("GET /api/torrents/{hash}", s.getTorrent)
 	h("PATCH /api/torrents/{hash}", s.patchTorrent)
 	h("DELETE /api/torrents/{hash}", s.deleteTorrent)

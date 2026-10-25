@@ -44,8 +44,13 @@ export default function Torrents() {
   const [drag, setDrag] = useState(false);
   const [confirmDel, setConfirmDel] = useState<TorrentInfo | null>(null);
   const [open, setOpen] = useState<string | null>(params.get('sel'));
+  const [disk, setDisk] = useState<DiskReport | null>(null);
+  const [showDisk, setShowDisk] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const items = ov?.items || [];
+  const loadDisk = () => api.get<DiskReport>('/api/torrents/disk').then(setDisk).catch(() => {});
+  // Re-check whenever a torrent comes or goes.
+  useEffect(() => { loadDisk(); }, [items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setTab = (t: Tab) => { const n = new URLSearchParams(params); n.set('tab', t); setParams(n, { replace: true }); };
   const streamT = items.find((x) => x.hash === sel) || items.find((x) => x.mode === 'stream' && x.status !== 'done') || null;
@@ -121,7 +126,7 @@ export default function Torrents() {
               : <Link className="pill" to="/settings#torrents" style={{ cursor: 'pointer' }}><Dot />{tr('Без привязки к VPN', 'Not bound to VPN')}</Link>)}
           <span className="pill mono" style={{ cursor: 'default' }}>↓ {fmtSpeed(ov?.down || 0)}</span>
           <span className="pill mono" style={{ cursor: 'default' }}>↑ {fmtSpeed(ov?.up || 0)}</span>
-          {ov && <span className="pill" style={{ cursor: 'default', ...(ov.diskLow ? { background: 'var(--err-bg)', color: 'var(--err-fg)' } : {}) }}>{tr('Свободно', 'Free')} {Math.round(ov.freeGB)} {tr('ГБ', 'GB')}</span>}
+          {ov && <button className="pill" title={tr('Что занимает место в папке загрузок', 'What takes space in the download folder')} onClick={() => setShowDisk(true)} style={ov.diskLow ? { background: 'var(--err-bg)', color: 'var(--err-fg)' } : undefined}>{tr('Свободно', 'Free')} {Math.round(ov.freeGB)} {tr('ГБ', 'GB')}</button>}
         </div>
       </div>
 
@@ -138,6 +143,12 @@ export default function Torrents() {
         <button type="button" className="btn btn-l" disabled={busy || !magnet.trim()} onClick={() => add({ magnet: magnet.trim() }, 'download')}><Icon name="download" size={18} />{tr('Скачать', 'Download')}</button>
       </form>
       {err && <div className="err">{err}</div>}
+      {disk && disk.leftover >= 100 << 20 && (
+        <div className="glass" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, border: '1px solid var(--line)' }}>
+          <span style={{ flex: '1 1 300px' }}>{tr(`Файлы удалённых и недокачанных раздач занимают ${fmtSize(disk.leftover)}.`, `Files of removed and unfinished torrents take ${fmtSize(disk.leftover)}.`)}</span>
+          <button className="btn btn-r sm" onClick={() => setShowDisk(true)}>{tr('Освободить место', 'Free up space')}</button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
         <section aria-label={tr('Список раздач', 'Torrents')} style={{ flex: '999 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -223,6 +234,7 @@ export default function Torrents() {
           </div>
         </Modal>
       )}
+      {showDisk && disk && <DiskDialog disk={disk} onClose={() => setShowDisk(false)} onDone={(freed) => { setShowDisk(false); loadDisk(); toast(tr(`Освобождено ${fmtSize(freed)}`, `Freed ${fmtSize(freed)}`)); }} />}
       {confirmDel && <DeleteDialog t={confirmDel} onClose={() => setConfirmDel(null)} onDone={() => { if (sel === confirmDel.hash) setSel(null); setConfirmDel(null); }} />}
     </main>
   );
@@ -230,10 +242,65 @@ export default function Torrents() {
 
 function Dot() { return <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />; }
 
+type DiskReport = {
+  dir: string; freeGB: number; active: number; leftover: number; leftoverN: number; library: number; libraryN: number; libraryOwned: boolean;
+  items: { path: string; size: number; library: boolean; linked: boolean }[];
+};
+
+// What the download folder holds beyond the torrents in the list, and a way to
+// delete it: leftovers of removed torrents, and optionally the library files
+// those torrents left behind.
+function DiskDialog({ disk, onClose, onDone }: { disk: DiskReport; onClose: () => void; onDone: (freed: number) => void }) {
+  const [lib, setLib] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const shown = disk.items.filter((x) => !x.linked && (!x.library || lib)).slice(0, 12);
+  const total = disk.leftover + (lib ? disk.library : 0);
+  const go = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await api.post<{ freed: number; failed: string[] | null }>('/api/torrents/cleanup', { library: lib });
+      if (r.failed?.length) { setErr(tr(`Не удалось удалить (файл открыт в другой программе?): ${r.failed.join(', ')}`, `Could not delete (open in another program?): ${r.failed.join(', ')}`)); setBusy(false); return; }
+      onDone(r.freed);
+    } catch (e: any) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <Modal title={tr('Место на диске', 'Disk space')} onClose={onClose}>
+      <div className="sub mono" style={{ wordBreak: 'break-all' }}>{disk.dir}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 16px', fontSize: 'calc(13px * var(--fs))' }}>
+        <span>{tr('Свободно на диске', 'Free on disk')}</span><span className="mono">{fmtSize(disk.freeGB * 2 ** 30)}</span>
+        <span>{tr('Раздачи в списке', 'Torrents in the list')}</span><span className="mono">{fmtSize(disk.active)}</span>
+        <span>{tr('Остатки удалённых и недокачанных раздач', 'Leftovers of removed and unfinished torrents')}</span><span className="mono">{fmtSize(disk.leftover)}</span>
+        {disk.libraryOwned && <><span>{tr('Фильмы и сериалы в библиотеке без раздачи', 'Library films and shows without a torrent')}</span><span className="mono">{fmtSize(disk.library)}</span></>}
+      </div>
+      {disk.libraryOwned && disk.libraryN > 0 && (
+        <label className="chk"><input type="checkbox" checked={lib} onChange={(e) => setLib(e.target.checked)} />{tr(`Удалить и фильмы из библиотеки, у которых уже нет раздачи (${fmtSize(disk.library)})`, `Also delete library films whose torrent is gone (${fmtSize(disk.library)})`)}</label>
+      )}
+      {shown.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto', fontSize: 'calc(12px * var(--fs))' }}>
+          {shown.map((x) => (
+            <div key={x.path} style={{ display: 'flex', gap: 10 }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.path}>{x.path}</span>
+              <span className="mono" style={{ color: 'var(--mut)' }}>{fmtSize(x.size)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {total === 0 && <div className="sub">{tr('Лишних файлов нет.', 'No leftover files.')}</div>}
+      {err && <div className="err">{err}</div>}
+      <div className="row">
+        <button className="btn btn-r sm" onClick={go} disabled={busy || total === 0}>{busy ? <span className="spin" /> : null}{tr(`Удалить ${fmtSize(total)}`, `Delete ${fmtSize(total)}`)}</button>
+        <button className="btn btn-l sm" onClick={onClose}>{tr('Закрыть', 'Close')}</button>
+      </div>
+    </Modal>
+  );
+}
+
 function DeleteDialog({ t, onClose, onDone }: { t: TorrentInfo; onClose: () => void; onDone: () => void }) {
   const finished = t.status === 'done' || t.status === 'seeding' || (t.imported?.length ?? 0) > 0;
   const [data, setData] = useState(true);
-  const [lib, setLib] = useState(false);
+  // A library copy is a hard link of the same file: without it nothing is freed.
+  const [lib, setLib] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const go = async () => {
