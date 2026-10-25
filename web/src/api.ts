@@ -1,4 +1,5 @@
 // Typed client for the Rivo server REST API.
+import { tr } from './i18n';
 
 export type Track = { index: number; codec: string; lang: string; title: string; channels?: number; default?: boolean; external?: string };
 export type FileInfo = {
@@ -159,20 +160,20 @@ export function fmtLeft(sec: number, t: (k: string) => string): string {
 }
 
 export function fmtSize(b: number): string {
-  if (b >= 1 << 30) return (b / (1 << 30)).toFixed(1).replace('.', ',') + ' ГБ';
-  if (b >= 1 << 20) return Math.round(b / (1 << 20)) + ' МБ';
-  if (b >= 1 << 10) return Math.round(b / (1 << 10)) + ' КБ';
-  return b + ' Б';
+  if (b >= 1 << 30) return tr((b / (1 << 30)).toFixed(1).replace('.', ',') + ' ГБ', (b / (1 << 30)).toFixed(1) + ' GB');
+  if (b >= 1 << 20) return Math.round(b / (1 << 20)) + tr(' МБ', ' MB');
+  if (b >= 1 << 10) return Math.round(b / (1 << 10)) + tr(' КБ', ' KB');
+  return b + tr(' Б', ' B');
 }
 
 export function fmtSpeed(bps: number): string {
   if (bps < 1024) return '—';
-  if (bps >= 1 << 20) return (bps / (1 << 20)).toFixed(1) + ' МБ/с';
-  return Math.round(bps / 1024) + ' КБ/с';
+  if (bps >= 1 << 20) return (bps / (1 << 20)).toFixed(1) + tr(' МБ/с', ' MB/s');
+  return Math.round(bps / 1024) + tr(' КБ/с', ' KB/s');
 }
 
 export function fmtRuntime(min: number): string {
   if (!min) return '';
   const h = Math.floor(min / 60), m = min % 60;
-  return h ? `${h} ч ${m} мин` : `${m} мин`;
+  return h ? tr(`${h} ч ${m} мин`, `${h} h ${m} min`) : tr(`${m} мин`, `${m} min`);
 }

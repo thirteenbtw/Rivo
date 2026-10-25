@@ -1,9 +1,12 @@
+<p align="right"><b>Русский</b> · <a href="README.en.md">English</a></p>
+
 <p align="center">
   <img src="docs/media/banner.jpg" alt="Rivo — Your movies. Any screen." width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/thirteenbtw/homecinema/actions/workflows/build.yml"><img src="https://github.com/thirteenbtw/homecinema/actions/workflows/build.yml/badge.svg" alt="build"></a>
+  <a href="https://github.com/thirteenbtw/Rivo/actions/workflows/build.yml"><img src="https://github.com/thirteenbtw/Rivo/actions/workflows/build.yml/badge.svg" alt="build"></a>
+  <a href="https://github.com/thirteenbtw/Rivo/releases/latest"><img src="https://img.shields.io/github/v/release/thirteenbtw/Rivo?color=A5B4FC&label=release" alt="release"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-5B6EE1?logo=windows&logoColor=white" alt="Windows 10 | 11">
   <img src="https://img.shields.io/badge/Go-server-00ADD8?logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/React-UI-61DAFB?logo=react&logoColor=black" alt="React">
@@ -17,11 +20,11 @@
 </p>
 
 <p align="center">
-  <a href="#установка"><b>Скачать</b></a> ·
+  <a href="https://github.com/thirteenbtw/Rivo/releases/latest"><b>Скачать</b></a> ·
   <a href="#возможности">Возможности</a> ·
   <a href="#скриншоты">Скриншоты</a> ·
   <a href="#разработка">Разработка</a> ·
-  <a href="#english">English</a>
+  <a href="README.en.md">English</a>
 </p>
 
 <p align="center">
@@ -104,8 +107,8 @@ Magnet и `.torrent`, режим «Смотреть сразу» с послед
 
 ## Установка
 
-1. Откройте [**Releases**](https://github.com/thirteenbtw/homecinema/releases) и скачайте `Rivo_<версия>_x64-setup.exe`.
-   Пока релиза нет, свежая сборка лежит в [**Actions**](https://github.com/thirteenbtw/homecinema/actions/workflows/build.yml): выберите последний зелёный запуск и скачайте артефакт `Rivo-windows-installer` (нужен вход в GitHub).
+1. Скачайте установщик [**Rivo_0.1.0_x64-setup.exe**](https://github.com/thirteenbtw/Rivo/releases/latest) со страницы последнего релиза.
+   Самая свежая сборка из `main` лежит в [Actions](https://github.com/thirteenbtw/Rivo/actions/workflows/build.yml): артефакт `Rivo-windows-installer` у последнего зелёного запуска (нужен вход в GitHub).
 2. Запустите установщик. Он ставит сервер, плеер и FFmpeg, а также открывает порт в брандмауэре только для частных сетей.
 3. При первом запуске укажите папки с фильмами и сериалами. Всё остальное Rivo сделает сам.
 
@@ -167,6 +170,8 @@ cd desktop && npm ci && npx tauri build
 
 Флаги сервера: `-data`, `-listen` (по умолчанию `0.0.0.0:8096`, при занятом порте пробует следующие), `-ffmpeg`, `-ffprobe`, `-dev`, `-exit-on-stdin-close` (для оболочки). Когда сервер готов, он печатает `HOMECINEMA_READY http://127.0.0.1:<порт>` — по этой строке оболочка открывает окно.
 
+Скриншоты и GIF для README делает [`tools/demo`](tools/demo): он запускает настоящее приложение с поддельным TMDB и выдуманным каталогом (`DEMO_LANG=en tools/demo/run.sh` — английский комплект).
+
 </details>
 
 <details>
@@ -189,12 +194,4 @@ cd desktop && npm ci && npx tauri build
 
 FFmpeg поставляется в LGPL-сборке как отдельные `ffmpeg.exe` / `ffprobe.exe`. Данные о фильмах — [TMDB](https://www.themoviedb.org/); Rivo не связан с TMDB и не одобрен ею. Ответственность за законность загружаемого и раздаваемого через торренты контента лежит на пользователе; в приложении нет встроенного контента.
 
----
-
-## English
-
-**Rivo** is a home media server for Windows 10/11. Point it at your folders and it builds a poster library with TMDB metadata, plays everything in its own player (direct play or hardware-accelerated transcoding, HDR → SDR, subtitles), casts to Google Cast TVs with a remote and shared watch position, and streams torrents while they download (VPN binding with kill switch). Up to five profiles, light/dark/OLED themes, Russian and English UI. It works only inside your LAN, with no telemetry.
-
-**Install:** grab `Rivo_<version>_x64-setup.exe` from [Releases](https://github.com/thirteenbtw/homecinema/releases), or the `Rivo-windows-installer` artifact from the latest green [Actions run](https://github.com/thirteenbtw/homecinema/actions/workflows/build.yml). **Build from source:** see [Разработка](#разработка) above — the commands are the same in any language.
-
-<sub>Titles, posters and people in the screenshots are fictional and generated for the demo.</sub>
+<p align="center"><a href="README.en.md">Read this in English →</a></p>

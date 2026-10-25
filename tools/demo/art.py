@@ -175,7 +175,7 @@ def poster(path, title, orig, tagline, pal, kind, seed, style=0, W=500, H=750):
     fl = font("light", 15)
     d.text(((W - d.textlength(tagline, font=fl)) / 2, 34), tagline, font=fl, fill=(235, 235, 235))
     fb = font("light", 9)
-    credits = "РЕЖИССЁР  ·  ОПЕРАТОР  ·  КОМПОЗИТОР  ·  ПРОДЮСЕРЫ  ·  В РОЛЯХ"
+    credits = "РЕЖИССЁР  ·  ОПЕРАТОР  ·  КОМПОЗИТОР  ·  ПРОДЮСЕРЫ  ·  В РОЛЯХ" if orig else "DIRECTED BY  ·  CINEMATOGRAPHY  ·  MUSIC  ·  PRODUCED BY  ·  STARRING"
     d.text(((W - d.textlength(credits, font=fb)) / 2, H - 28), credits, font=fb, fill=(150, 150, 160))
     im.save(path, quality=88)
 

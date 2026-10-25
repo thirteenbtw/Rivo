@@ -3,7 +3,7 @@ const B = 'http://127.0.0.1:8096';
 (async () => {
   const b = await chromium.launch();
   async function ctxFor(theme) {
-    const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, locale: 'ru-RU' });
+    const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, locale: process.env.DEMO_LANG === 'en' ? 'en-US' : 'ru-RU' });
     await ctx.addInitScript(t => { try { localStorage.setItem('hc.prefs', JSON.stringify({ theme: t })); } catch {} }, theme);
     return ctx;
   }

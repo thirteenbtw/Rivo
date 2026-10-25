@@ -91,3 +91,54 @@ PEOPLE = [
     (311, "Вера Климова", True, 0, "Acting", "Актриса МХТ, снимается в сериалах.", "1981-06-06", "Москва"),
     (312, "Георгий Нестеров", False, 2, "Acting", "Народный артист, полвека на сцене.", "1958-10-10", "Тбилиси"),
 ]
+
+# English: id -> (tagline, overview)
+EN = {
+    101: ("There is no ticket back", "A night cargo pilot is ordered to land in mountains that appear on no map. Before dawn he has to find out who is really waiting for him on the ground."),
+    102: ("The forest remembers", "Two brothers return to a taiga village to sell their father's house and find the map he spent twenty years drawing."),
+    103: ("At night the rules change", "A night-shift cab driver becomes the only witness to the robbery of the century and has to drive the robbers around the city until morning."),
+    104: ("The sea gives back what it took", "One summer on a small island, a painter and a lighthouse keeper try to work out whether you can start over at forty."),
+    105: ("Mars is closer than it looks", "A crew trains in the desert before a flight to Mars, but contact with base goes dead and the tracks in the sand lead the wrong way."),
+    106: ("Three minutes of darkness", "Three scientists vanish from an observatory during a total solar eclipse. A year later their colleague returns on the day of the next one."),
+    107: ("Sometimes you just have to stay", "A former footballer takes a job guarding a seaside resort closed for winter and, to his own surprise, starts coaching the local kids."),
+    108: ("Only the truth is colder", "A rescue team heads into the mountains after a missing group and realises the missing don't really want to be found."),
+    109: ("The city never stops glowing", "In a city where billboards read your mind, a hacker finds a way to switch them off for one night."),
+    110: ("Every summer feels like the first", "Three generations of one family gather in the old garden that is about to be sold. They have one summer to come to terms."),
+    111: ("Don't stay on the shore", "A group of friends gets stranded on a tidal island, and the water is rising faster than it should."),
+    112: ("Eight thousand metres of silence", "A climber returns to the summit where her partner died to finish his last route."),
+    113: ("Sun at its height, gun in its holster", "In a dusty town, a retired sheriff walks out onto Main Street one last time."),
+    114: ("The last metro stop", "The driver of the last metro train notices a passenger who has been riding the loop for three nights in a row."),
+    115: ("There is light even in the dark", "A girl and her grandfather go into the night forest to find the fireflies he has talked about all his life."),
+    116: ("The sun never comes here", "A journalist disappears in a village at the foot of a mountain where the sun doesn't show for three months."),
+    201: ("You can see the light from afar", "A new lighthouse keeper finds his predecessor's diary, which describes things that haven't happened yet."),
+    202: ("Minus eighty", "The winter shift at an Antarctic station goes to plan until a signal comes from under the ice."),
+    203: ("The week is over", "Four friends meet in the same bar every Friday. Each episode is one evening and one story."),
+    204: ("Three thousand kilometres", "A father and his grown-up daughter cross the country in an old van to scatter her mother's ashes by the sea."),
+    205: ("Everyone here is hiding something", "A detective from the capital arrives in a forest village where everyone is a witness and nobody saw anything."),
+    206: ("Four hundred kilometres above the Earth", "The crew of a private orbital station learns that nobody is waiting for their return ship any more."),
+    207: ("Bite or no bite", "A crew of fishermen from a northern village decides to open a restaurant without ever having cooked anything but fish soup."),
+    208: ("Call me yesterday", "A detective finds a radio that lets him talk to a police officer from 1999."),
+}
+
+GENRES_EN = {28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime", 18: "Drama", 10751: "Family", 27: "Horror",
+             9648: "Mystery", 10749: "Romance", 878: "Science Fiction", 53: "Thriller", 37: "Western",
+             10759: "Action & Adventure", 10765: "Sci-Fi & Fantasy"}
+
+# id -> (name, bio, place)
+PEOPLE_EN = {
+    301: ("Anna Sokolova", "Stage and screen actress. Graduated from GITIS and has played more than thirty roles.", "Saint Petersburg"),
+    302: ("Ilya Gromov", "Started out in street theatre; known for playing quiet heroes.", "Yekaterinburg"),
+    303: ("Maria Lebedeva", "Has acted since childhood and won awards at several festivals.", "Moscow"),
+    304: ("Dmitry Orlov", "Director and screenwriter. Makes genre films with real people at their heart.", "Novosibirsk"),
+    305: ("Eva Mironova", "Actress and singer who has starred in musicals.", "Kazan"),
+    306: ("Pavel Vetrov", "Character actor, equally convincing in comedy and drama.", "Samara"),
+    307: ("Olga Belova", "Actress known for festival cinema.", "Perm"),
+    308: ("Artyom Zorin", "Former stuntman who does his own stunts.", "Vladivostok"),
+    309: ("Kira Lanskaya", "Director of documentary and feature films.", "Kaliningrad"),
+    310: ("Nikita Sobolev", "Young actor; his first lead role was in Red Desert.", "Rostov-on-Don"),
+    311: ("Vera Klimova", "Moscow Art Theatre actress who also works in television.", "Moscow"),
+    312: ("Georgy Nesterov", "People's Artist with half a century on stage.", "Tbilisi"),
+}
+
+ROLES_EN = ["Vera", "Andrey", "Captain Leskov", "Marina", "Old Man", "Sonya", "Voice on the Radio"]
+EPISODES_EN = ["Pilot", "Signal", "Second Shift", "White Night", "Quiet Hour", "Point of No Return", "Storm", "Dawn"]

@@ -121,7 +121,7 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
             {item?.cert && <span style={{ fontSize: 'calc(11px * var(--fs))', padding: '2px 7px', border: '1px solid #FFFFFF66', borderRadius: 4 }}>{item.cert}</span>}
             {rating > 0 && <span style={{ fontSize: 'calc(11px * var(--fs))', padding: '2px 7px', borderRadius: 4, background: '#01B4E4', color: '#06222C' }}>TMDB {rating.toFixed(1)}</span>}
             {item?.quality && <span style={{ fontSize: 'calc(11px * var(--fs))', padding: '2px 7px', borderRadius: 4, background: '#FFFFFF2E' }}>{item.quality}</span>}
-            {show && <span style={{ fontSize: 'calc(11px * var(--fs))', padding: '2px 7px', borderRadius: 4, background: '#FFFFFF2E' }}>{seasons.length} {tr('сез.', 'seasons')} · {show.episodes} {t('episodes')}</span>}
+            {show && <span style={{ fontSize: 'calc(11px * var(--fs))', padding: '2px 7px', borderRadius: 4, background: '#FFFFFF2E' }}>{seasons.length} {tr('сез.', seasons.length === 1 ? 'season' : 'seasons')} · {show.episodes} {t('episodes')}</span>}
           </div>
           {prog && prog.duration > 0 && !prog.watched && prog.position > 30 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 380, fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC' }}>
@@ -130,7 +130,7 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
-            {file && target && <Link className="btn btn-w" to={playUrl(file.id, target.id)}><PlayGlyph />{resume ? t('continue') : t('watch')}{kind === 'show' && target.season ? ` С${target.season}·Э${target.episode}` : ''}</Link>}
+            {file && target && <Link className="btn btn-w" to={playUrl(file.id, target.id)}><PlayGlyph />{resume ? t('continue') : t('watch')}{kind === 'show' && target.season ? ` ${tr('С', 'S')}${target.season}·${tr('Э', 'E')}${target.episode}` : ''}</Link>}
             {file && <button className="btn btn-g" onClick={() => openCast({ fileId: file.id, start: resume, title, audio, sub })}><Icon name="cast" size={18} />{t('toTv')}</button>}
             <button className="btn btn-g" aria-pressed={later} onClick={() => toggleList('later', !later)}><Icon name={later ? 'check' : 'plus'} size={18} />{later ? t('inListOn') : t('inList')}</button>
             <button className="btn btn-g" aria-label={t('addFav')} aria-pressed={fav} onClick={() => toggleList('favorites', !fav)} style={{ width: 44, padding: 0, background: fav ? 'var(--acc)' : undefined }}><Icon name="heart" size={18} /></button>
@@ -163,7 +163,7 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
                         <div className="sub" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginTop: 4 }}>{e.overview || [e.quality, e.runtime ? fmtRuntime(e.runtime) : ''].filter(Boolean).join(' · ')}</div>
                       </div>
                       {ef && <Link className="btn btn-l sm" to={`/play/${ef.id}?item=${e.id}${p && !p.watched && p.position > 30 ? '&start=' + Math.floor(p.position) : ''}`} aria-label={`${t('watch')} ${e.episode}`}><PlayGlyph size={14} /></Link>}
-                      {ef && <button className="btn btn-l sm" aria-label={`${t('toTv')} ${e.episode}`} onClick={() => openCast({ fileId: ef.id, title: `${title} · С${e.season}Э${e.episode}`, start: p && !p.watched ? p.position : 0 })}><Icon name="cast" size={16} /></button>}
+                      {ef && <button className="btn btn-l sm" aria-label={`${t('toTv')} ${e.episode}`} onClick={() => openCast({ fileId: ef.id, title: `${title} · ${tr('С', 'S')}${e.season}${tr('Э', 'E')}${e.episode}`, start: p && !p.watched ? p.position : 0 })}><Icon name="cast" size={16} /></button>}
                     </div>
                   );
                 })}
