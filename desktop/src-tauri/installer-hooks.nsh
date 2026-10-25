@@ -23,13 +23,19 @@
   Delete $R0
   RMDir $R1
   nsExec::Exec 'netsh advfirewall firewall delete rule name="HomeCinema"'
+  ; and whatever Windows itself added for the old server when it asked
+  nsExec::Exec 'netsh advfirewall firewall delete rule name=all program="$R1\homecinema-server.exe"'
   hc_done:
 !macroend
 
 ; Allow the media server in Windows Firewall on private networks so TVs and
 ; phones on the LAN can reach it. Public networks stay closed.
+; Every rule for the server goes first: if the Windows "allow access?" prompt
+; was dismissed it leaves block rules for rivo-server.exe, and a block rule
+; wins over our allow, so TVs would never be found.
 !macro NSIS_HOOK_POSTINSTALL
   nsExec::Exec 'netsh advfirewall firewall delete rule name="Rivo"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name=all program="$INSTDIR\rivo-server.exe"'
   nsExec::Exec 'netsh advfirewall firewall add rule name="Rivo" dir=in action=allow program="$INSTDIR\rivo-server.exe" enable=yes profile=private'
 !macroend
 
