@@ -43,6 +43,20 @@ func (s *Store) migrate() error {
 		WHERE folder_title=''`); err != nil {
 		return err
 	}
+	// Version 1 reads track names from MP4 handler_name and the SDH and
+	// commentary flags: probe every file again on the next scan.
+	var ver int
+	if err := s.DB.QueryRow(`PRAGMA user_version`).Scan(&ver); err != nil {
+		return err
+	}
+	if ver < 1 {
+		if _, err := s.Exec(`UPDATE files SET probed=0`); err != nil {
+			return err
+		}
+		if _, err := s.Exec(`PRAGMA user_version=1`); err != nil {
+			return err
+		}
+	}
 	return s.MergeDuplicateShows()
 }
 

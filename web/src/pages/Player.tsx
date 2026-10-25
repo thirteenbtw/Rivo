@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Hls from 'hls.js';
-import { api, clientCaps, fmtSize, fmtTime, type Item, type Playback, type StreamStatus } from '../api';
+import { api, clientCaps, fmtSize, fmtTime, type Item, type Playback, type PlayTrack, type StreamStatus } from '../api';
 import { useApp } from '../state';
 import { tr } from '../i18n';
 import { Icon, PauseGlyph, PlayGlyph } from '../components/Icon';
@@ -387,8 +387,8 @@ export default function Player() {
             <>
               <Opt on={subIdx < 0} name={tr('Выключены', 'Off')} onClick={() => pickSub(-1)} />
               {pb.subs.map((s) => {
-                const [name, ...meta] = s.label.split(' · ');
-                return <Opt key={s.index} on={s.index === subIdx} name={name} meta={meta.join(' · ') + (s.bitmap ? ' · ' + tr('вжигаются', 'burned in') : '')} onClick={() => pickSub(s.index)} />;
+                const [name, meta] = trackText(s);
+                return <Opt key={s.index} on={s.index === subIdx} name={name} meta={meta + (s.bitmap ? ' · ' + tr('вжигаются', 'burned in') : '')} onClick={() => pickSub(s.index)} />;
               })}
               {pb.subs.length === 0 && <div style={{ fontSize: 'calc(12px * var(--fs))', color: '#6B6F76', padding: '4px 10px' }}>{hash ? tr('Субтитры потока доступны после загрузки', 'Stream subtitles appear after download') : tr('В файле нет субтитров. Положите .srt рядом с видео — он появится здесь.', 'No subtitles. Put an .srt next to the video.')}</div>}
               <div style={{ height: 1, background: '#ECECE9', margin: '4px 0' }} />
@@ -403,8 +403,8 @@ export default function Player() {
             </>
           )}
           {panel === 'audio' && pb.audio.map((a) => {
-            const [name, ...meta] = a.label.split(' · ');
-            return <Opt key={a.index} on={a.selected} name={name} meta={meta.join(' · ')} onClick={() => pickAudio(a.index)} />;
+            const [name, meta] = trackText(a);
+            return <Opt key={a.index} on={a.selected} name={name} meta={meta} onClick={() => pickAudio(a.index)} />;
           })}
           {panel === 'audio' && pb.audio.length === 0 && <div style={{ fontSize: 'calc(12px * var(--fs))', color: '#6B6F76', padding: '4px 10px' }}>{tr('Звуковых дорожек нет', 'No audio tracks')}</div>}
           {panel === 'speed' && speeds.map((s) => <Opt key={s} on={speed === s} name={`${s}×`} onClick={() => { setSpeed(s); setPanel(null); }} />)}
@@ -454,12 +454,21 @@ export default function Player() {
   );
 }
 
+// Older servers send only label ("name · meta · meta").
+function trackText(t: PlayTrack): [string, string] {
+  if (t.name) return [t.name, t.meta || ''];
+  const [name, ...meta] = t.label.split(' · ');
+  return [name, meta.join(' · ')];
+}
+
 function Opt({ on, name, meta, onClick }: { on: boolean; name: string; meta?: string; onClick: () => void }) {
   return (
     <button className="opt" onClick={onClick} aria-pressed={on}>
       <span style={{ width: 16, display: 'grid', placeItems: 'center', color: 'var(--acc-dk)' }}>{on && <Icon name="check" size={16} />}</span>
-      <span style={{ flex: 1, fontWeight: on ? 700 : 500 }}>{name}</span>
-      {meta && <span style={{ fontSize: 'calc(11px * var(--fs))', color: '#6B6F76' }}>{meta}</span>}
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: meta ? '6px 0' : 0 }}>
+        <span style={{ fontWeight: on ? 700 : 500, overflowWrap: 'anywhere' }}>{name}</span>
+        {meta && <span style={{ fontSize: 'calc(11px * var(--fs))', color: '#6B6F76' }}>{meta}</span>}
+      </span>
     </button>
   );
 }

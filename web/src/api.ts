@@ -1,7 +1,7 @@
 // Typed client for the Rivo server REST API.
 import { tr } from './i18n';
 
-export type Track = { index: number; codec: string; lang: string; title: string; channels?: number; default?: boolean; external?: string };
+export type Track = { index: number; codec: string; lang: string; title: string; channels?: number; default?: boolean; forced?: boolean; sdh?: boolean; comment?: boolean; external?: string };
 export type FileInfo = {
   id: number; itemId: number; name: string; size: number; container: string; duration: number; videoCodec: string;
   width: number; height: number; bitDepth: number; hdr: string; audio: Track[] | null; subs: Track[] | null;
@@ -31,7 +31,7 @@ export type AppState = {
   version: string; setupDone: boolean; authRequired: boolean; lanUrls: string[]; uiLang: string; local: boolean;
   profiles?: Profile[]; profileId?: number;
 };
-export type PlayTrack = { index: number; label: string; codec: string; lang: string; selected: boolean; url?: string; bitmap?: boolean; external?: boolean };
+export type PlayTrack = { index: number; label: string; name?: string; meta?: string; codec: string; lang: string; selected: boolean; url?: string; bitmap?: boolean; external?: boolean };
 export type Playback = {
   mode: 'direct' | 'hls'; url: string; offset: number; start: number; duration: number; session?: string; reason?: string;
   summary: string; encoder?: string; audio: PlayTrack[]; subs: PlayTrack[]; fileId: number; itemId: number; title: string; info: string; external: boolean;
