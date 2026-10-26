@@ -51,7 +51,7 @@ func (s sparseStorage) OpenTorrent(ctx context.Context, info *metainfo.Info, ih 
 		if _, err := os.Stat(p); err == nil {
 			continue // already complete
 		}
-		if err := makeSparse(p + ".part"); err != nil {
+		if err := makeSparse(p+".part", fi.Length); err != nil {
 			log.Printf("torrent: sparse %s: %v", p, err)
 		}
 	}

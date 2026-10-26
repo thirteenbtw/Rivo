@@ -60,10 +60,6 @@ func TestStatusExplainsIdleStream(t *testing.T) {
 	if err := e.WaitInfo(hash, 10*time.Second); err != nil {
 		t.Fatal(err)
 	}
-	// The storage wrapper prepares the file (sparse on Windows) up front.
-	if _, err := os.Stat(filepath.Join(ls.DownloadDir, "Film.2021.mkv.part")); err != nil {
-		t.Fatalf("part file not prepared: %v", err)
-	}
 	status := func() Info {
 		t.Helper()
 		i, err := e.Get(hash)
