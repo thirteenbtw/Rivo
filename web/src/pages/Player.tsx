@@ -341,8 +341,13 @@ export default function Player() {
         onEnded={() => { saveProgress(true); if (next && autoNext) goNext(); }}
         onError={() => { if (!hlsRef.current && !directFailed()) setErr(tr('Браузер не смог открыть файл. Попробуйте внешний плеер или отправьте на ТВ.', 'The browser could not open this file.')); }}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000000' }} />
+      {/* Keeps something painted over the video. When nothing is drawn on top,
+          Chromium/WebView2 on Windows hands fullscreen video to a hardware
+          overlay and stops painting the page: hidden controls never come back
+          and subtitles don't show until something else redraws. */}
+      <div aria-hidden style={{ position: 'absolute', inset: 0, background: '#00000001', pointerEvents: 'none' }} />
 
-      <header onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 64, display: 'flex', alignItems: 'center', gap: 16, padding: '0 20px', background: 'linear-gradient(#000000E6,#00000000)', opacity: showUI ? 1 : 0, transition: 'opacity .3s' }}>
+      <header onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 64, display: 'flex', alignItems: 'center', gap: 16, padding: '0 20px', background: 'linear-gradient(#000000E6,#00000000)', opacity: showUI ? 1 : 0.001, transition: 'opacity .3s' }}>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: 'calc(14px * var(--fs))', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pb?.title || tr('Загрузка…', 'Loading…')}</span>
           <span style={{ fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }} title={pb?.reason}>{pb ? [pb.info || pb.summary, pb.encoder && pb.mode === 'hls' ? pb.encoder.toUpperCase() : ''].filter(Boolean).join(' · ') : ''}</span>
@@ -431,7 +436,7 @@ export default function Player() {
         </section>
       )}
 
-      <footer onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 20px', background: 'linear-gradient(#00000000,#000000E6 40%)', display: 'flex', flexDirection: 'column', gap: 8, opacity: showUI ? 1 : 0, transition: 'opacity .3s', paddingTop: 32 }}>
+      <footer onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 20px', background: 'linear-gradient(#00000000,#000000E6 40%)', display: 'flex', flexDirection: 'column', gap: 8, opacity: showUI ? 1 : 0.001, transition: 'opacity .3s', paddingTop: 32 }}>
         {stream && (
           <div style={{ display: 'flex', gap: 14, fontSize: 'calc(11px * var(--fs))', color: '#A9ADB4' }} className="mono">
             <span>{tr('Загружено', 'Downloaded')} {Math.round(stream.progress * 100)}%</span><span>↓ {fmtSize(stream.down)}/s</span><span>{stream.seeds} {tr('сидов', 'seeds')} · {stream.peers} {tr('пиров', 'peers')}</span>
