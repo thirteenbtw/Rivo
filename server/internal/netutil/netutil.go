@@ -77,18 +77,33 @@ func LANAddrs() []string {
 	return out
 }
 
+// SubnetAddrFor returns the local IPv4 address on the same subnet as device,
+// or nil when no interface shares it.
+func SubnetAddrFor(device string) net.IP {
+	dip := net.ParseIP(device)
+	if dip == nil {
+		return nil
+	}
+	ifs, _ := net.Interfaces()
+	for _, i := range ifs {
+		if i.Flags&net.FlagUp == 0 {
+			continue
+		}
+		addrs, _ := i.Addrs()
+		for _, a := range addrs {
+			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.To4() != nil && ipn.Contains(dip) {
+				return ipn.IP
+			}
+		}
+	}
+	return nil
+}
+
 // LANAddrFor picks the local address on the same subnet as a device, so a TV
 // gets a stream URL it can reach.
 func LANAddrFor(device string) string {
-	dip := net.ParseIP(device)
-	ifs, _ := net.Interfaces()
-	for _, i := range ifs {
-		addrs, _ := i.Addrs()
-		for _, a := range addrs {
-			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.To4() != nil && dip != nil && ipn.Contains(dip) {
-				return ipn.IP.String()
-			}
-		}
+	if ip := SubnetAddrFor(device); ip != nil {
+		return ip.String()
 	}
 	if l := LANAddrs(); len(l) > 0 {
 		return l[0]

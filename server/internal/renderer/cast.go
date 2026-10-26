@@ -75,7 +75,7 @@ func (c *castRenderer) connectLocked() error {
 	if c.app != nil {
 		return nil
 	}
-	app := application.NewApplication(application.WithCacheDisabled(true), application.WithConnectionRetries(2))
+	app := application.NewApplication(application.WithCacheDisabled(true), application.WithConnectionRetries(2), application.WithConnection(newCastConn()))
 	done := make(chan error, 1)
 	go func() { done <- app.Start(c.dev.Addr, c.dev.Port) }()
 	select {
@@ -83,7 +83,7 @@ func (c *castRenderer) connectLocked() error {
 		if err != nil {
 			return err
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(20 * time.Second):
 		return errors.New("нет ответа от устройства")
 	}
 	c.app = app
