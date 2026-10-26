@@ -320,6 +320,8 @@ export default function Player() {
   const showUI = !idle || paused || !!panel;
   const castNow = () => {
     video.current?.pause();
+    // The TV picker lives outside the player, so it can't show over a fullscreen element.
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (hash) openCast({ torrent: hash, file: torrentFile, title: pb?.title });
     else openCast({ fileId: Number(fileId), start: cur, title: pb?.title, audio: opts.current.audio !== '' ? Number(opts.current.audio) : undefined, sub: subIdx >= 0 ? subIdx : undefined });
   };
