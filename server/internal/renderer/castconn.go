@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -52,6 +53,10 @@ func (c *castConn) Start(addr string, port int) error {
 		conn, err = tls.DialWithDialer(d, "tcp", target, &tls.Config{InsecureSkipVerify: true})
 	}
 	if err != nil {
+		var ne net.Error
+		if errors.As(err, &ne) && ne.Timeout() {
+			return fmt.Errorf("ТВ %s не отвечает: проверьте, что он включён, а VPN не забирает себе локальную сеть (%w)", target, err)
+		}
 		return fmt.Errorf("нет связи с ТВ %s: %w", target, err)
 	}
 	c.conn = conn
