@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { api, ApiError, fmtSize, fmtSpeed, type SearchResult, type StreamStatus, type TorrentInfo } from '../api';
+import { api, ApiError, fmtSize, fmtSpeed, type SearchResult, type StreamStatus, type TorrentInfo, type TorrentSettings } from '../api';
 import { useApp } from '../state';
 import { tr } from '../i18n';
 import { Icon, PlayGlyph } from '../components/Icon';
@@ -47,6 +47,9 @@ export default function Torrents() {
   const [disk, setDisk] = useState<DiskReport | null>(null);
   const [showDisk, setShowDisk] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Keep after watching: the default from settings, changeable per add.
+  const [keep, setKeep] = useState(true);
+  useEffect(() => { api.get<TorrentSettings>('/api/torrent-settings').then((s) => setKeep(s.keepWatched)).catch(() => {}); }, []);
   const items = ov?.items || [];
   const loadDisk = () => api.get<DiskReport>('/api/torrents/disk').then(setDisk).catch(() => {});
   // Re-check whenever a torrent comes or goes.
@@ -61,10 +64,10 @@ export default function Torrents() {
       let res: { hash: string };
       if (body.file) {
         const fd = new FormData();
-        fd.append('file', body.file); fd.append('mode', mode); fd.append('keep', '1');
+        fd.append('file', body.file); fd.append('mode', mode); fd.append('keep', keep ? '1' : '0');
         res = await api.post('/api/torrents', fd);
       } else {
-        res = await api.post('/api/torrents', { magnet: body.magnet, link: body.link, mode, keep: true });
+        res = await api.post('/api/torrents', { magnet: body.magnet, link: body.link, mode, keep });
       }
       setMagnet('');
       setSel(res.hash);
@@ -141,6 +144,10 @@ export default function Torrents() {
         </label>
         <button className="btn btn-r" disabled={busy || !magnet.trim()}><PlayGlyph />{tr('Смотреть сразу', 'Watch now')}</button>
         <button type="button" className="btn btn-l" disabled={busy || !magnet.trim()} onClick={() => add({ magnet: magnet.trim() }, 'download')}><Icon name="download" size={18} />{tr('Скачать', 'Download')}</button>
+        <label style={{ flex: '1 1 100%', display: 'flex', alignItems: 'center', gap: 10, fontSize: 'calc(13px * var(--fs))', color: 'var(--mut2)' }} title={tr('Раздача и её файлы удалятся с диска, когда фильм досмотрен. Относится и к раздачам из «Поиска».', 'The torrent and its files are deleted once watched. Applies to torrents from Search too.')}>
+          <input type="checkbox" checked={!keep} onChange={(e) => setKeep(!e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--acc)' }} />
+          {tr('Не сохранять после просмотра — удалить с диска, когда досмотрю', 'Don’t keep after watching — delete from disk once watched')}
+        </label>
       </form>
       {err && <div className="err">{err}</div>}
       {disk && disk.leftover >= 100 << 20 && (
@@ -178,7 +185,7 @@ export default function Torrents() {
                             <tr style={{ background: isSel ? 'var(--soft)' : undefined, cursor: 'pointer' }} onClick={() => setSel(r.hash)}>
                               <td className="td" style={{ maxWidth: 0, width: '100%' }}>
                                 <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name}>{r.name || r.hash}</div>
-                                <div className="sub">{r.size ? fmtSize(r.size) : '—'}{r.fileCount > 1 ? ` · ${r.fileCount} ${tr('файлов', 'files')}` : ''}{r.mode === 'stream' ? ` · ${tr('последовательно', 'sequential')}` : ''}{r.error ? ` · ${r.error}` : ''}</div>
+                                <div className="sub">{r.size ? fmtSize(r.size) : '—'}{r.fileCount > 1 ? ` · ${r.fileCount} ${tr('файлов', 'files')}` : ''}{r.mode === 'stream' ? ` · ${tr('последовательно', 'sequential')}` : ''}{!r.keep ? ` · ${tr('удалится после просмотра', 'deleted after watching')}` : ''}{r.error ? ` · ${r.error}` : ''}</div>
                               </td>
                               <td className="td" style={{ minWidth: 120 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -415,6 +422,7 @@ function StreamPanel({ t, onCast, onKeep }: { t: TorrentInfo; onCast: (file: num
         <input type="checkbox" checked={t.keep} onChange={(e) => onKeep(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--acc)' }} />
         {tr('Сохранить в библиотеку после просмотра', 'Keep in library after watching')}
       </label>
+      {!t.keep && <div style={{ marginTop: -10, fontSize: 'calc(12px * var(--fs))', color: 'var(--mut)', lineHeight: 1.45 }}>{tr('Когда фильм досмотрен до конца и плеер закрыт, раздача и её файлы (вместе с недокачанными .part) удалятся с диска.', 'Once the film is watched to the end and the player is closed, the torrent and its files (unfinished .part included) are deleted.')}</div>}
     </aside>
   );
 }

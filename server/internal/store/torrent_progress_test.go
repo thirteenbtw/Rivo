@@ -32,3 +32,20 @@ func TestTorrentProgress(t *testing.T) {
 		t.Fatalf("forgotten: %v", got)
 	}
 }
+
+// Played to the end once, a file stays watched after it starts over.
+func TestTorrentWatched(t *testing.T) {
+	s := openTest(t)
+	p, _ := s.Profiles()
+	pid := p[0].ID
+	_ = s.SaveTorrentProgress(pid, "ABC", 0, 600, 7200)
+	_ = s.SaveTorrentProgress(pid, "abc", 1, 6950, 7200) // inside the last five minutes
+	w, last := s.TorrentWatched("ABC")
+	if w[0] || !w[1] || last == 0 {
+		t.Fatalf("watched %v last %d", w, last)
+	}
+	_ = s.SaveTorrentProgress(pid, "abc", 1, 60, 7200) // watching it again
+	if w, _ := s.TorrentWatched("abc"); !w[1] {
+		t.Fatal("rewatch cleared watched")
+	}
+}

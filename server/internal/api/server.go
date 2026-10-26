@@ -58,6 +58,7 @@ func (s *Server) Handler() http.Handler {
 	s.ratings = ratings.New()
 	s.lbHTTP = &http.Client{Timeout: 20 * time.Second}
 	go s.letterboxdLoop()
+	go s.removeWatchedLoop()
 	mux := http.NewServeMux()
 	s.routes(mux)
 	return s.middleware(mux)

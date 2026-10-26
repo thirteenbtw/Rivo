@@ -46,6 +46,7 @@ func (r *streamReader) Close() error {
 	r.e.mu.Lock()
 	delete(r.m.streams, r)
 	if len(r.m.streams) == 0 {
+		r.m.closedAt = time.Now()
 		r.e.applyFilePriorities(r.m)
 	}
 	r.e.mu.Unlock()

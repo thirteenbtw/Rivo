@@ -509,6 +509,18 @@ func (m *Manager) StopWhere(match func(input string) bool) {
 	}
 }
 
+// Uses reports whether a session reads an input that matches.
+func (m *Manager) Uses(match func(input string) bool) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, s := range m.sessions {
+		if match(s.Opts.Input) {
+			return true
+		}
+	}
+	return false
+}
+
 type SessionInfo struct {
 	ID      string  `json:"id"`
 	FileID  int64   `json:"fileId"`
