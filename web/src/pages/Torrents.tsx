@@ -234,8 +234,8 @@ export default function Torrents() {
           </div>
         </Modal>
       )}
-      {showDisk && disk && <DiskDialog disk={disk} onClose={() => setShowDisk(false)} onDone={(freed) => { setShowDisk(false); loadDisk(); toast(tr(`Освобождено ${fmtSize(freed)}`, `Freed ${fmtSize(freed)}`)); }} />}
-      {confirmDel && <DeleteDialog t={confirmDel} onClose={() => setConfirmDel(null)} onDone={() => { if (sel === confirmDel.hash) setSel(null); setConfirmDel(null); }} />}
+      {showDisk && disk && <DiskDialog disk={disk} onClose={() => setShowDisk(false)} onDone={(freed, pending) => { setShowDisk(false); loadDisk(); toast(tr(`Освобождено ${fmtSize(freed)}`, `Freed ${fmtSize(freed)}`) + (pending ? '. ' + pending : '')); }} />}
+      {confirmDel && <DeleteDialog t={confirmDel} onClose={() => setConfirmDel(null)} onDone={(pending) => { if (sel === confirmDel.hash) setSel(null); setConfirmDel(null); if (pending) toast(pending); }} />}
     </main>
   );
 }
@@ -250,7 +250,7 @@ type DiskReport = {
 // What the download folder holds beyond the torrents in the list, and a way to
 // delete it: leftovers of removed torrents, and optionally the library files
 // those torrents left behind.
-function DiskDialog({ disk, onClose, onDone }: { disk: DiskReport; onClose: () => void; onDone: (freed: number) => void }) {
+function DiskDialog({ disk, onClose, onDone }: { disk: DiskReport; onClose: () => void; onDone: (freed: number, pending?: string) => void }) {
   const [lib, setLib] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -259,9 +259,9 @@ function DiskDialog({ disk, onClose, onDone }: { disk: DiskReport; onClose: () =
   const go = async () => {
     setBusy(true); setErr(null);
     try {
-      const r = await api.post<{ freed: number; failed: string[] | null }>('/api/torrents/cleanup', { library: lib });
-      if (r.failed?.length) { setErr(tr(`Не удалось удалить (файл открыт в другой программе?): ${r.failed.join(', ')}`, `Could not delete (open in another program?): ${r.failed.join(', ')}`)); setBusy(false); return; }
-      onDone(r.freed);
+      // Files still open elsewhere are queued on the server and deleted once released.
+      const r = await api.post<{ freed: number; pending?: string }>('/api/torrents/cleanup', { library: lib });
+      onDone(r.freed, r.pending);
     } catch (e: any) { setErr(e.message); setBusy(false); }
   };
   return (
@@ -296,7 +296,7 @@ function DiskDialog({ disk, onClose, onDone }: { disk: DiskReport; onClose: () =
   );
 }
 
-function DeleteDialog({ t, onClose, onDone }: { t: TorrentInfo; onClose: () => void; onDone: () => void }) {
+function DeleteDialog({ t, onClose, onDone }: { t: TorrentInfo; onClose: () => void; onDone: (pending?: string) => void }) {
   const finished = t.status === 'done' || t.status === 'seeding' || (t.imported?.length ?? 0) > 0;
   const [data, setData] = useState(true);
   // A library copy is a hard link of the same file: without it nothing is freed.
@@ -305,7 +305,7 @@ function DeleteDialog({ t, onClose, onDone }: { t: TorrentInfo; onClose: () => v
   const [busy, setBusy] = useState(false);
   const go = async () => {
     setBusy(true);
-    try { await api.del(`/api/torrents/${t.hash}${data ? '?data=1' + (lib ? '&library=1' : '') : ''}`); onDone(); } catch (e: any) { setErr(e.message); setBusy(false); }
+    try { const r = await api.del<{ pending?: string }>(`/api/torrents/${t.hash}${data ? '?data=1' + (lib ? '&library=1' : '') : ''}`); onDone(r?.pending); } catch (e: any) { setErr(e.message); setBusy(false); }
   };
   return (
     <Modal title={tr('Удалить раздачу?', 'Remove torrent?')} onClose={onClose}>

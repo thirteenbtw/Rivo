@@ -196,3 +196,68 @@ func TestCleanupLeftovers(t *testing.T) {
 		t.Errorf("library root removed")
 	}
 }
+
+// Files that stayed locked are queued and deleted by a later retry, and the
+// emptied folder goes with them.
+func TestDeleteLater(t *testing.T) {
+	dir := t.TempDir()
+	db, err := store.Open(filepath.Join(dir, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	e := New(db, events.New(), dir, dir)
+	sub := filepath.Join(dir, "Show")
+	f := filepath.Join(sub, "e01.mkv.part")
+	_ = os.MkdirAll(sub, 0o755)
+	_ = os.WriteFile(f, []byte("x"), 0o644)
+	e.deleteLater([]string{f}, []string{sub})
+	e.deleteLater([]string{f}, nil) // no duplicates
+	if pd := e.pending(); len(pd.Files) != 1 {
+		t.Fatalf("pending: %+v", pd)
+	}
+	e.retryPending()
+	if _, err := os.Stat(sub); !os.IsNotExist(err) {
+		t.Errorf("folder still exists")
+	}
+	if pd := e.pending(); len(pd.Files)+len(pd.Dirs) != 0 {
+		t.Errorf("queue not cleared: %+v", pd)
+	}
+}
+
+// Removing a torrent while the player still reads it must not hang, and
+// neither must a restart.
+func TestRemoveWhileStreaming(t *testing.T) {
+	dir := t.TempDir()
+	dl := filepath.Join(dir, "dl")
+	_ = os.MkdirAll(dl, 0o755)
+	src := filepath.Join(dl, "Film.2020.mkv")
+	_ = os.WriteFile(src, bytes.Repeat([]byte("hc"), 300<<10), 0o644)
+	e, hash := testEngine(t, dir, dl, src)
+	if _, _, err := e.openStream(hash, 0); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		if err := e.Restart(); err != nil {
+			done <- err
+			return
+		}
+		if _, _, err := e.openStream(hash, 0); err != nil {
+			done <- err
+			return
+		}
+		done <- e.Remove(hash, true, false)
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("hung")
+	}
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Errorf("file still exists")
+	}
+}
