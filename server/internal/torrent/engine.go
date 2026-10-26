@@ -254,7 +254,7 @@ func (e *Engine) Restart() error {
 	// No download limit stays nil: an unlimited limiter with zero burst
 	// reports no tokens, and anacrolix then never opens a peer connection,
 	// so magnets hang forever waiting for metadata.
-	e.stor = storage.NewFileOpts(storage.NewFileClientOpts{ClientBaseDir: st.DownloadDir})
+	e.stor = newStorage(st.DownloadDir)
 	cfg.DefaultStorage = e.stor
 	cl, err := torrent.NewClient(cfg)
 	if err != nil && !cfg.DisableIPv6 {
