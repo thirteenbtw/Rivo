@@ -218,6 +218,10 @@ func (e *Engine) Restart() error {
 	cfg.NoDHT = !st.DHT
 	cfg.DisablePEX = !st.PEX
 	cfg.NoDefaultPortForwarding = !st.UPnP
+	// TCP only: anacrolix's uTP tops out far below TCP (about 10 MB/s against
+	// over 100 MB/s on loopback), and seeds reached over it streamed at a
+	// fraction of what qBittorrent got from the same four seeds.
+	cfg.DisableUTP = true
 	cfg.HeaderObfuscationPolicy = torrent.HeaderObfuscationPolicy{
 		Preferred:        st.Encryption != "off",
 		RequirePreferred: st.Encryption == "require",
