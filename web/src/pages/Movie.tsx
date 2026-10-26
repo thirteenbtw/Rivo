@@ -207,13 +207,13 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
               <h2 className="h2" style={{ fontSize: 'calc(14px * var(--fs))' }}>{t('tracks')}</h2>
               <label className="fld">{t('audio')}
                 <select className="sel" value={audio ?? ''} onChange={(e) => setAudio(Number(e.target.value))}>
-                  {(file.audio || []).map((a, i) => <option key={a.index} value={a.index}>{[...trackName(a, i), codecName(a.codec) + (a.channels ? ' ' + channels(a.channels) : ''), a.comment ? tr('комментарии', 'commentary') : ''].filter(Boolean).join(' · ')}</option>)}
+                  {(file.audio || []).map((a, i) => <option key={a.index} value={a.index}>{[...numbered(file.audio || [], i), codecName(a.codec) + (a.channels ? ' ' + channels(a.channels) : ''), a.comment ? tr('комментарии', 'commentary') : ''].filter(Boolean).join(' · ')}</option>)}
                 </select>
               </label>
               <label className="fld">{t('subtitles')}
                 <select className="sel" value={sub} onChange={(e) => setSub(Number(e.target.value))}>
                   <option value={-1}>{t('off')}</option>
-                  {(file.subs || []).map((s, i) => <option key={i} value={i}>{[...trackName(s, i), s.forced ? tr('только надписи', 'forced') : '', s.sdh ? tr('для глухих', 'SDH') : '', s.codec.replace('_subtitle', '').toUpperCase(), s.external ? tr('внешние', 'external') : tr('встроенные', 'embedded')].filter(Boolean).join(' · ')}</option>)}
+                  {(file.subs || []).map((s, i) => <option key={i} value={i}>{[...numbered(file.subs || [], i), s.forced ? tr('только надписи', 'forced') : '', s.sdh ? tr('для глухих', 'SDH') : '', s.codec.replace('_subtitle', '').toUpperCase(), s.external ? tr('внешние', 'external') : tr('встроенные', 'embedded')].filter(Boolean).join(' · ')}</option>)}
                 </select>
               </label>
             </section>
@@ -263,6 +263,13 @@ function trackName(t: Track, i: number): string[] {
   const title = (t.title || '').trim();
   if (title && title.toLowerCase() !== l.toLowerCase() && langNames[title.toLowerCase()] !== l) return l && !title.toLowerCase().includes(l.toLowerCase()) ? [title, l] : [title];
   return [l || `${tr('Дорожка', 'Track')} ${i + 1}`];
+}
+// Blu-ray tracks have no names: number the ones that would read the same.
+function numbered(ts: Track[], i: number): string[] {
+  const parts = trackName(ts[i], i);
+  const same = ts.map((t, j) => trackName(t, j)[0]).filter((n, j) => n === parts[0] && j <= i).length;
+  const total = ts.filter((t, j) => trackName(t, j)[0] === parts[0]).length;
+  return total > 1 ? [`${parts[0]} ${same}`, ...parts.slice(1)] : parts;
 }
 function codecName(c: string) { return ({ hevc: 'HEVC', h264: 'H.264', ac3: 'DD', eac3: 'DD+', dts: 'DTS', truehd: 'TrueHD', aac: 'AAC', av1: 'AV1', vp9: 'VP9', opus: 'Opus', flac: 'FLAC', mp3: 'MP3' } as Record<string, string>)[c] || c.toUpperCase(); }
 function channels(n: number) { return ({ 1: '1.0', 2: '2.0', 6: '5.1', 8: '7.1' } as Record<number, string>)[n] || `${n}ch`; }

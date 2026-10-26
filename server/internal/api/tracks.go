@@ -132,6 +132,9 @@ func audioFormat(t store.Track) string {
 	default:
 		ch = fmt.Sprintf(" %d кан.", t.Channels)
 	}
+	if p := profileName(t); p != "" {
+		return p + ch
+	}
 	c := map[string]string{"eac3": "DD+", "ac3": "DD", "dts": "DTS", "truehd": "TrueHD", "aac": "AAC", "mp3": "MP3", "opus": "Opus", "flac": "FLAC", "vorbis": "Vorbis", "mp2": "MP2", "pcm_s16le": "PCM", "pcm_s24le": "PCM"}[t.Codec]
 	if c == "" {
 		c = strings.ToUpper(t.Codec)
@@ -164,4 +167,56 @@ func subLabel(t store.Track, i int) (name, meta string) {
 		parts = append(parts, "встроенные")
 	}
 	return name, strings.Join(parts, " · ")
+}
+
+// profileName names the variant a profile tells apart from the plain codec:
+// DTS-HD MA rather than DTS, Atmos on top of TrueHD or DD+.
+func profileName(t store.Track) string {
+	p := strings.ToLower(t.Profile)
+	switch {
+	case t.Codec == "dts" && strings.Contains(p, "dts:x"):
+		return "DTS:X"
+	case t.Codec == "dts" && strings.Contains(p, "dts-hd ma"):
+		return "DTS-HD MA"
+	case t.Codec == "dts" && strings.Contains(p, "dts-hd hra"):
+		return "DTS-HD HRA"
+	case t.Codec == "dts" && strings.Contains(p, "dts-es"):
+		return "DTS-ES"
+	case t.Codec == "truehd" && strings.Contains(p, "atmos"):
+		return "TrueHD Atmos"
+	case t.Codec == "eac3" && strings.Contains(p, "atmos"):
+		return "DD+ Atmos"
+	}
+	return ""
+}
+
+// nameDuplicates numbers tracks that would read the same. Blu-ray (m2ts)
+// carries no track names, so a remux with four Russian dubs would show four
+// identical "Русский" rows. Same-looking audio also gets its bitrate, the one
+// thing that still tells, say, a dub from a voice-over in such a file.
+func nameDuplicates(ts []trackOut, audio bool) {
+	if audio {
+		same := map[string]int{}
+		for _, t := range ts {
+			same[t.Name+"|"+t.Meta]++
+		}
+		for i := range ts {
+			if t := &ts[i]; same[t.Name+"|"+t.Meta] > 1 && t.kbps > 0 {
+				t.Meta += fmt.Sprintf(" · %d кбит/с", t.kbps)
+			}
+		}
+	}
+	count := map[string]int{}
+	for _, t := range ts {
+		count[t.Name]++
+	}
+	seen := map[string]int{}
+	for i := range ts {
+		t := &ts[i]
+		if count[t.Name] > 1 {
+			seen[t.Name]++
+			t.Name = fmt.Sprintf("%s %d", t.Name, seen[t.Name])
+		}
+		t.Label = t.Name + " · " + t.Meta
+	}
 }
