@@ -195,7 +195,7 @@ func (e *Engine) CleanupPaths(withLibrary bool) []string {
 	return out
 }
 
-// Cleanup deletes the leftovers (and, withLibrary, library files whose torrent
+// Cleanup deletes the leftovers (queueing what is still open elsewhere) (and, withLibrary, library files whose torrent
 // is gone), then the folders that emptied. It returns the bytes freed and
 // what could not be deleted.
 func (e *Engine) Cleanup(withLibrary bool) (int64, []string) {
@@ -234,6 +234,9 @@ func (e *Engine) Cleanup(withLibrary bool) (int64, []string) {
 		}
 	}
 	failed := removeAll(files, dirs)
+	if len(failed) > 0 {
+		e.deleteLater(failed, dirs)
+	}
 	var freed int64
 	left := map[string]bool{}
 	for _, p := range failed {

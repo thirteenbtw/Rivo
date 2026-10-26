@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
@@ -137,6 +138,10 @@ func (s *Server) deleteTorrent(w http.ResponseWriter, r *http.Request) error {
 	if data && lib {
 		s.Scanner.RequestScan(0) // drop the deleted copies from the library
 	}
+	var pe *torrent.PendingError
+	if errors.As(err, &pe) {
+		return writeJSON(w, map[string]any{"ok": true, "pending": pe.Error()})
+	}
 	if err != nil {
 		return err
 	}
@@ -162,7 +167,11 @@ func (s *Server) torrentCleanup(w http.ResponseWriter, r *http.Request) error {
 	if b.Library {
 		s.Scanner.RequestScan(0)
 	}
-	return writeJSON(w, map[string]any{"freed": freed, "failed": failed})
+	res := map[string]any{"freed": freed}
+	if len(failed) > 0 {
+		res["pending"] = torrent.LockedError(failed).Error()
+	}
+	return writeJSON(w, res)
 }
 
 func (s *Server) torrentStream(w http.ResponseWriter, r *http.Request) error {

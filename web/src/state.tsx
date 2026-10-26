@@ -100,7 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(null), 3500);
+    toastTimer.current = window.setTimeout(() => setToastMsg(null), msg.length > 80 ? 8000 : 3500);
   }, []);
 
   const value: Ctx = { state, reload, profile, prefs, setPrefs, scan, torrents, devices, cast, lastProgress, toast, castTarget, openCast: setCastTarget };

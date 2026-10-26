@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -149,6 +150,7 @@ type Engine struct {
 	restartAt time.Time
 	dumpedAt  time.Time
 	stor      storage.ClientImplCloser
+	pendMu    sync.Mutex
 }
 
 func New(s *store.Store, bus *events.Bus, dataDir, cacheDir string) *Engine {
@@ -300,7 +302,7 @@ func (e *Engine) closeLocked() {
 	}
 	for _, m := range e.items {
 		for r := range m.streams {
-			r.Close()
+			r.Reader.Close() // not r.Close: that takes e.mu, which we hold
 		}
 	}
 	e.items = map[string]*managed{}
@@ -551,16 +553,117 @@ func (e *Engine) Remove(hash string, deleteData, withLibrary bool) error {
 	if deleteData {
 		files, dirs = e.dataPathsLocked(m, withLibrary)
 	}
+	// Let go of everything that reads the files before deleting them.
+	for r := range m.streams {
+		r.Reader.Close()
+	}
 	m.t.Drop()
 	e.mu.Unlock()
+	select {
+	case <-m.t.Closed():
+	case <-time.After(5 * time.Second):
+	}
 	failed := removeAll(files, dirs)
 	if err := e.Store.DeleteTorrent(m.row.InfoHash); err != nil {
 		return err
 	}
 	if len(failed) > 0 {
-		return fmt.Errorf("раздача убрана, но не удалось удалить с диска (файл открыт в другой программе?): %s", strings.Join(failed, ", "))
+		e.deleteLater(failed, dirs)
+		return LockedError(failed)
 	}
 	return nil
+}
+
+// PendingError says some files were still open elsewhere; they are queued and
+// deleted as soon as they are released.
+type PendingError struct {
+	Files    []string
+	Programs []string
+}
+
+func (p *PendingError) Error() string {
+	names := make([]string, len(p.Files))
+	for i, f := range p.Files {
+		names[i] = filepath.Base(f)
+	}
+	who := "другая программа"
+	if len(p.Programs) > 0 {
+		who = strings.Join(p.Programs, ", ")
+	}
+	return fmt.Sprintf("Файл пока открыт (%s). Rivo удалит его сам, как только он освободится: %s", who, strings.Join(names, ", "))
+}
+
+func LockedError(files []string) *PendingError {
+	pe := &PendingError{Files: files}
+	seen := map[string]bool{}
+	for _, f := range files {
+		for _, p := range lockedBy(f) {
+			if !seen[p] {
+				seen[p] = true
+				pe.Programs = append(pe.Programs, p)
+			}
+		}
+	}
+	return pe
+}
+
+// ---------- deferred deletes ----------
+
+type pendingDelete struct {
+	Files []string `json:"files"`
+	Dirs  []string `json:"dirs"`
+}
+
+func (e *Engine) pending() pendingDelete {
+	var pd pendingDelete
+	_ = json.Unmarshal([]byte(e.Store.Setting("pendingDelete", "{}")), &pd)
+	return pd
+}
+
+// deleteLater queues files Windows would not let go of; the loop retries them,
+// across restarts too.
+func (e *Engine) deleteLater(files, dirs []string) {
+	e.pendMu.Lock()
+	defer e.pendMu.Unlock()
+	pd := e.pending()
+	pd.Files = appendNew(pd.Files, files...)
+	pd.Dirs = appendNew(pd.Dirs, dirs...)
+	b, _ := json.Marshal(pd)
+	_ = e.Store.SetSetting("pendingDelete", string(b))
+}
+
+func (e *Engine) retryPending() {
+	e.pendMu.Lock()
+	defer e.pendMu.Unlock()
+	pd := e.pending()
+	if len(pd.Files) == 0 && len(pd.Dirs) == 0 {
+		return
+	}
+	var left []string
+	for _, p := range pd.Files {
+		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			left = append(left, p)
+		}
+	}
+	if len(left) > 0 {
+		pd.Files = left
+	} else {
+		for _, d := range pd.Dirs {
+			removeEmptyDirs(d)
+		}
+		pd = pendingDelete{}
+	}
+	b, _ := json.Marshal(pd)
+	_ = e.Store.SetSetting("pendingDelete", string(b))
+}
+
+func appendNew(list []string, add ...string) []string {
+	for _, a := range add {
+		if !slices.Contains(list, a) {
+			list = append(list, a)
+		}
+	}
+	return list
 }
 
 // DataPaths lists the files Remove deletes, so the caller can stop whatever
@@ -685,6 +788,9 @@ func (e *Engine) loop(ctx context.Context) {
 		e.checkVPN()
 		if n%10 == 0 {
 			e.checkDisk()
+		}
+		if n%15 == 1 {
+			e.retryPending()
 		}
 		e.step()
 		e.Bus.Publish("torrents", e.List())
