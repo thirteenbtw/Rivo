@@ -12,6 +12,8 @@ import (
 type Track struct {
 	Index     int    `json:"index"` // stream index inside the file, or -1 for external
 	Codec     string `json:"codec"`
+	Profile   string `json:"profile,omitempty"` // DTS-HD MA, Dolby Atmos…
+	Kbps      int    `json:"kbps,omitempty"`
 	Lang      string `json:"lang"`
 	Title     string `json:"title"`
 	Channels  int    `json:"channels,omitempty"`

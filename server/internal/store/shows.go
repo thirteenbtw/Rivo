@@ -44,16 +44,17 @@ func (s *Store) migrate() error {
 		return err
 	}
 	// Version 1 reads track names from MP4 handler_name and the SDH and
-	// commentary flags: probe every file again on the next scan.
+	// commentary flags, version 2 the audio profile and bitrate: probe every
+	// file again on the next scan.
 	var ver int
 	if err := s.DB.QueryRow(`PRAGMA user_version`).Scan(&ver); err != nil {
 		return err
 	}
-	if ver < 1 {
+	if ver < 2 {
 		if _, err := s.Exec(`UPDATE files SET probed=0`); err != nil {
 			return err
 		}
-		if _, err := s.Exec(`PRAGMA user_version=1`); err != nil {
+		if _, err := s.Exec(`PRAGMA user_version=2`); err != nil {
 			return err
 		}
 	}

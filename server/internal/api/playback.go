@@ -192,6 +192,7 @@ type trackOut struct {
 	URL      string `json:"url,omitempty"`
 	Bitmap   bool   `json:"bitmap,omitempty"`
 	External bool   `json:"external,omitempty"`
+	kbps     int
 }
 
 type playback struct {
@@ -298,12 +299,13 @@ func (s *Server) preparePlayback(ctx context.Context, f *store.File, input strin
 			audio = &a
 		}
 		name, meta := audioLabel(a, i)
-		pb.Audio = append(pb.Audio, trackOut{Index: a.Index, Label: name + " · " + meta, Name: name, Meta: meta, Codec: a.Codec, Lang: a.Lang, Selected: sel})
+		pb.Audio = append(pb.Audio, trackOut{Index: a.Index, Label: name + " · " + meta, Name: name, Meta: meta, Codec: a.Codec, Lang: a.Lang, Selected: sel, kbps: a.Kbps})
 	}
 	if audio == nil && len(f.Audio) > 0 {
 		audio = &f.Audio[0]
 		pb.Audio[0].Selected = true
 	}
+	nameDuplicates(pb.Audio, true)
 	firstAudio := audio == nil || audio.Index == f.Audio[0].Index
 
 	d := s.decide(f, audio, caps, quality, firstAudio)
@@ -372,6 +374,7 @@ func (s *Server) preparePlayback(ctx context.Context, f *store.File, input strin
 		}
 		pb.Subs = append(pb.Subs, to)
 	}
+	nameDuplicates(pb.Subs, false)
 	return pb, nil
 }
 

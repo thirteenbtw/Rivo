@@ -41,3 +41,25 @@ func TestTrackLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestNameDuplicates(t *testing.T) {
+	// A Blu-ray remux: no track names, several dubs in one language.
+	audio := []store.Track{
+		{Codec: "ac3", Lang: "rus", Channels: 6, Kbps: 640},
+		{Codec: "ac3", Lang: "rus", Channels: 6, Kbps: 448},
+		{Codec: "dts", Profile: "DTS-HD MA", Lang: "rus", Channels: 6, Kbps: 3500},
+		{Codec: "ac3", Lang: "ukr", Channels: 2, Kbps: 192},
+	}
+	var out []trackOut
+	for i, a := range audio {
+		n, m := audioLabel(a, i)
+		out = append(out, trackOut{Name: n, Meta: m, kbps: a.Kbps})
+	}
+	nameDuplicates(out, true)
+	want := [][2]string{{"Русский 1", "DD 5.1 · 640 кбит/с"}, {"Русский 2", "DD 5.1 · 448 кбит/с"}, {"Русский 3", "DTS-HD MA 5.1"}, {"Українська", "DD 2.0"}}
+	for i, w := range want {
+		if out[i].Name != w[0] || out[i].Meta != w[1] || out[i].Label != w[0]+" · "+w[1] {
+			t.Errorf("%d: got %q / %q, want %q / %q", i, out[i].Name, out[i].Meta, w[0], w[1])
+		}
+	}
+}

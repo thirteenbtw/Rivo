@@ -31,6 +31,7 @@ type ffStream struct {
 	Height        int               `json:"height"`
 	PixFmt        string            `json:"pix_fmt"`
 	Channels      int               `json:"channels"`
+	BitRate       string            `json:"bit_rate"`
 	ColorTransfer string            `json:"color_transfer"`
 	BitsPerRaw    string            `json:"bits_per_raw_sample"`
 	Tags          map[string]string `json:"tags"`
@@ -115,7 +116,8 @@ func (p *Prober) run(ctx context.Context, path string, f *store.File, timeout ti
 			}
 			f.HDR = hdrKind(s)
 		case "audio":
-			f.Audio = append(f.Audio, store.Track{Index: s.Index, Codec: s.CodecName, Lang: lang, Title: title, Channels: s.Channels, Default: s.Disposition["default"] == 1,
+			kbps, _ := strconv.Atoi(s.BitRate)
+			f.Audio = append(f.Audio, store.Track{Index: s.Index, Codec: s.CodecName, Profile: s.Profile, Kbps: kbps / 1000, Lang: lang, Title: title, Channels: s.Channels, Default: s.Disposition["default"] == 1,
 				Comment: s.Disposition["comment"] == 1, Described: s.Disposition["visual_impaired"] == 1})
 		case "subtitle":
 			f.Subs = append(f.Subs, store.Track{Index: s.Index, Codec: s.CodecName, Lang: lang, Title: title, Default: s.Disposition["default"] == 1, Forced: s.Disposition["forced"] == 1,
