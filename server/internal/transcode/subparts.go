@@ -76,8 +76,9 @@ func (m *Manager) runSubJob(j *subJob, input string, t store.Track, from float64
 	defer cancel()
 	args := []string{"-hide_banner", "-v", "error", "-y", "-nostdin"}
 	if from > 0 {
-		// -copyts keeps cue times in movie time wherever extraction starts.
-		args = append(args, "-ss", strconv.FormatFloat(from, 'f', 3, 64), "-copyts")
+		// -copyts keeps cue times in movie time wherever extraction starts;
+		// -start_at_zero counts it from the file start, as from 0 does.
+		args = append(args, "-ss", strconv.FormatFloat(from, 'f', 3, 64), "-copyts", "-start_at_zero")
 	}
 	args = append(args, "-i", input, "-map", fmt.Sprintf("0:%d", t.Index), "-flush_packets", "1", "-f", "webvtt", j.part)
 	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
