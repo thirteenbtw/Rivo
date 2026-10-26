@@ -362,7 +362,10 @@ func (m *Manager) buildArgs(o Options, dir string) []string {
 	} else {
 		// async resampling fills gaps and drops overlaps after a seek or a
 		// damaged spot in a partly downloaded file instead of garbling sound.
-		args = append(args, "-af", "aresample=async=1000", "-c:a", "aac", "-ac", "2", "-b:a", "192k")
+		// It stretches at most 1 sample a second: a larger budget lets it
+		// slow the sound down whenever timestamps run ahead of the samples,
+		// which is heard as a lower, rasping voice.
+		args = append(args, "-af", "aresample=async=1", "-c:a", "aac", "-ac", "2", "-b:a", "192k")
 	}
 	if o.CopyVideo && o.Start > 0 {
 		args = append(args, "-muxdelay", "0", "-muxpreload", "0") // PTS = movie time
