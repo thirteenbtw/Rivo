@@ -352,6 +352,7 @@ function TorrentSection() {
         {dir('showsDir', tr('Куда переносить сериалы', 'Shows destination'))}
       </div>
       <label className="chk"><input type="checkbox" checked={draft.autoImport} onChange={(e) => set('autoImport', e.target.checked)} />{tr('Переносить готовые загрузки в библиотеку (Название (Год) / Сезон N)', 'Move finished downloads into the library')}</label>
+      <label className="chk"><input type="checkbox" checked={!draft.keepWatched} onChange={(e) => set('keepWatched', !e.target.checked)} />{tr('Не сохранять фильм после просмотра: удалять раздачу и файлы с диска, когда фильм досмотрен (по умолчанию для новых раздач)', 'Don’t keep after watching: delete the torrent and its files once watched (default for new torrents)')}</label>
 
       <h3 className="h2" style={{ fontSize: 'calc(14px * var(--fs))', marginTop: 4 }}>{tr('Сеть и VPN', 'Network & VPN')}</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>

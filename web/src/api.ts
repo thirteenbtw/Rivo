@@ -56,7 +56,7 @@ export type TorrentSettings = {
   downloadDir: string; moviesDir: string; showsDir: string; port: number; downKBs: number; upKBs: number; seedRatio: number;
   seedMinutes: number; bindIface: string; killSwitch: boolean; encryption: string; dht: boolean; pex: boolean; upnp: boolean;
   proxy: string; bufferMB: number; bufferPct: number; minFreeGB: number; maxActive: number; scheduleFrom: number; scheduleTo: number;
-  autoImport: boolean; acceptedRisk: boolean; trackers: string;
+  autoImport: boolean; keepWatched: boolean; acceptedRisk: boolean; trackers: string;
 };
 export type SearchResult = { indexer: string; title: string; link: string; magnet?: string; size: number; seeds: number; peers: number; quality: string; lang: string; date: string; score: number; best: boolean };
 export type CatalogItem = {

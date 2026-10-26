@@ -773,16 +773,40 @@ func (s *Store) Progress(profile, item int64) (*Progress, error) {
 }
 
 // SaveTorrentProgress remembers where a torrent file was left; a file played
-// to the end starts over next time.
+// to the end starts over next time and counts as watched.
 func (s *Store) SaveTorrentProgress(profile int64, hash string, file int, position, duration float64) error {
+	watched := duration > 0 && (position/duration >= 0.9 || duration-position <= 300)
 	if duration > 0 && position/duration >= 0.97 {
 		position = 0
 	}
-	_, err := s.Exec(`INSERT INTO torrent_progress(profile_id, hash, file_idx, position, duration, updated_at) VALUES(?,?,?,?,?,?)
+	_, err := s.Exec(`INSERT INTO torrent_progress(profile_id, hash, file_idx, position, duration, updated_at, watched) VALUES(?,?,?,?,?,?,?)
 		ON CONFLICT(profile_id, hash, file_idx) DO UPDATE SET position=excluded.position,
-		duration=CASE WHEN excluded.duration>0 THEN excluded.duration ELSE duration END, updated_at=excluded.updated_at`,
-		profile, strings.ToLower(hash), file, position, duration, now())
+		duration=CASE WHEN excluded.duration>0 THEN excluded.duration ELSE duration END, updated_at=excluded.updated_at,
+		watched=MAX(watched, excluded.watched)`,
+		profile, strings.ToLower(hash), file, position, duration, now(), watched)
 	return err
+}
+
+// TorrentWatched lists the files of a torrent some profile played to the end,
+// and when the player last reported a position in it (unix seconds).
+func (s *Store) TorrentWatched(hash string) (files map[int]bool, last int64) {
+	files = map[int]bool{}
+	rows, err := s.DB.Query(`SELECT file_idx, watched, updated_at FROM torrent_progress WHERE hash=?`, strings.ToLower(hash))
+	if err != nil {
+		return files, 0
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var f, w int
+		var at int64
+		if rows.Scan(&f, &w, &at) == nil {
+			if w != 0 {
+				files[f] = true
+			}
+			last = max(last, at)
+		}
+	}
+	return files, last
 }
 
 // TorrentProgress is the saved position in a torrent file, 0 when none.

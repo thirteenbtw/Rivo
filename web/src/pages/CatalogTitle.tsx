@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, ApiError, fmtRuntime, fmtSize, type CatalogTitle, type SearchResult } from '../api';
+import { api, ApiError, fmtRuntime, fmtSize, type CatalogTitle, type SearchResult, type TorrentSettings } from '../api';
 import { useApp, useAsync } from '../state';
 import { t, tr } from '../i18n';
 import { Art, Backdrop, ambientFor, paletteFor } from '../components/Art';
@@ -48,6 +48,8 @@ function Detail({ d }: { d: TitleResp }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [risk, setRisk] = useState<null | (() => void)>(null);
+  const [keep, setKeep] = useState(true);
+  useEffect(() => { api.get<TorrentSettings>('/api/torrent-settings').then((s) => setKeep(s.keepWatched)).catch(() => {}); }, []);
   const [all, setAll] = useState(false);
   const [sky] = paletteFor(x.title);
   if (x.trailer) rememberTrailer({ kind: x.kind, id: x.id }, x.trailer);
@@ -77,8 +79,8 @@ function Detail({ d }: { d: TitleResp }) {
   const add = async (r: SearchResult, mode: Mode) => {
     setBusy(r.link + mode);
     try {
-      const { hash } = await api.post<{ hash: string }>('/api/torrents', { link: r.link, magnet: r.magnet, mode, keep: true });
-      if (mode === 'download') toast(tr('Загрузка добавлена — после неё фильм появится в библиотеке', 'Download added — it lands in the library when done'));
+      const { hash } = await api.post<{ hash: string }>('/api/torrents', { link: r.link, magnet: r.magnet, mode, keep });
+      if (mode === 'download') toast(keep ? tr('Загрузка добавлена — после неё фильм появится в библиотеке', 'Download added — it lands in the library when done') : tr('Загрузка добавлена — после просмотра файлы удалятся', 'Download added — files are deleted after watching'));
       else if (show) nav(`/torrents?tab=stream&sel=${hash}`); // a season pack: pick the episode there
       else nav(`/play/torrent/${hash}`);
     } catch (e) {
@@ -128,6 +130,12 @@ function Detail({ d }: { d: TitleResp }) {
               {best && <button className="btn btn-g" disabled={!!busy} onClick={() => add(best, 'download')}><Icon name="download" size={18} />{tr('Скачать', 'Download')}</button>}
               {!best && !libLink && d.indexers && loading && <span className="btn btn-g" aria-live="polite"><span className="spin" />{tr('Ищем раздачи…', 'Looking for releases…')}</span>}
             </div>
+            {best && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'calc(13px * var(--fs))', color: '#D4D7DC', width: 'fit-content' }}>
+                <input type="checkbox" checked={!keep} onChange={(e) => setKeep(!e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--acc)' }} />
+                {tr('Не сохранять после просмотра', 'Don’t keep after watching')}
+              </label>
+            )}
             <MarkButtons x={x} />
           </div>
         </div>

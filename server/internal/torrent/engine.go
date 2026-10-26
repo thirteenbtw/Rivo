@@ -59,7 +59,10 @@ type Settings struct {
 	ScheduleFrom int     `json:"scheduleFrom"` // hour 0-23, -1 = off
 	ScheduleTo   int     `json:"scheduleTo"`
 	AutoImport   bool    `json:"autoImport"`
-	AcceptedRisk bool    `json:"acceptedRisk"` // legal notice acknowledged
+	// KeepWatched is the default of a new torrent's "keep after watching":
+	// off, a torrent and its files are deleted once it has been watched.
+	KeepWatched  bool `json:"keepWatched"`
+	AcceptedRisk bool `json:"acceptedRisk"` // legal notice acknowledged
 	// Trackers are added to every torrent (one URL per line): a bare magnet
 	// or one with dead trackers otherwise depends on DHT alone to find peers.
 	Trackers string `json:"trackers"`
@@ -98,7 +101,7 @@ func DefaultSettings(dataDir string) Settings {
 	return Settings{
 		DownloadDir: filepath.Join(dataDir, "Downloads"), Port: 42069, SeedRatio: 1.5, SeedMinutes: 0,
 		Encryption: "prefer", DHT: true, PEX: true, UPnP: true, BufferMB: 80, BufferPct: 3, MinFreeGB: 5,
-		MaxActive: 3, ScheduleFrom: -1, ScheduleTo: -1, AutoImport: true, Trackers: strings.Join(DefaultTrackers, "\n"),
+		MaxActive: 3, ScheduleFrom: -1, ScheduleTo: -1, AutoImport: true, KeepWatched: true, Trackers: strings.Join(DefaultTrackers, "\n"),
 	}
 }
 
@@ -124,6 +127,7 @@ type managed struct {
 	streams   map[*streamReader]struct{}
 	streamIdx int
 	streamPos int64
+	closedAt  time.Time // when the last player reader closed
 	seedFrom  time.Time
 	imported  []string
 	added     time.Time // when the torrent was added to this client run
@@ -670,6 +674,55 @@ func appendNew(list []string, add ...string) []string {
 	return list
 }
 
+// Disposable is a torrent kept only until it is watched.
+type Disposable struct {
+	Hash  string
+	Files []int // the video files to watch: extras and samples do not count
+}
+
+// Disposables lists the torrents not kept after watching that no player has
+// read for idle. The caller decides whether they have been watched.
+func (e *Engine) Disposables(idle time.Duration) []Disposable {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	var out []Disposable
+	for _, m := range e.items {
+		// Watched before a restart: count from when this run added it.
+		since := m.closedAt
+		if since.IsZero() {
+			since = m.added
+		}
+		if m.row.Keep || len(m.streams) > 0 || time.Since(since) < idle || m.t.Info() == nil {
+			continue
+		}
+		if d := disposable(m); len(d.Files) > 0 {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func disposable(m *managed) Disposable {
+	off := map[int]bool{}
+	for _, i := range m.row.FilesOff {
+		off[i] = true
+	}
+	d := Disposable{Hash: m.row.InfoHash}
+	files := m.t.Files()
+	var largest int64
+	for i, f := range files {
+		if !off[i] && !Blocked(f.Path()) && parse.IsVideo(f.Path()) {
+			largest = max(largest, f.Length())
+		}
+	}
+	for i, f := range files {
+		if !off[i] && !Blocked(f.Path()) && parse.IsVideo(f.Path()) && f.Length()*10 >= largest*3 {
+			d.Files = append(d.Files, i)
+		}
+	}
+	return d
+}
+
 // DataPaths lists the files Remove deletes, so the caller can stop whatever
 // still has them open first.
 func (e *Engine) DataPaths(hash string, withLibrary bool) []string {
@@ -929,7 +982,7 @@ func (e *Engine) step() {
 			if m.seedFrom.IsZero() {
 				m.seedFrom = time.Now()
 			}
-			if !m.row.Imported && st.AutoImport && (m.row.Mode == "download" || m.row.Keep) {
+			if !m.row.Imported && st.AutoImport && m.row.Keep {
 				m.row.Imported = true
 				_ = e.Store.SaveTorrent(m.row)
 				go e.importTorrent(m)

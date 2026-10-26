@@ -58,7 +58,35 @@ func (s *Store) migrate() error {
 			return err
 		}
 	}
+	if err := s.addColumn("torrent_progress", "watched", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
 	return s.MergeDuplicateShows()
+}
+
+// addColumn adds a column to a table created by an older version.
+func (s *Store) addColumn(table, col, def string) error {
+	rows, err := s.DB.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return err
+	}
+	found := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var dflt any
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		found = found || name == col
+	}
+	rows.Close()
+	if found {
+		return nil
+	}
+	_, err = s.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + col + ` ` + def)
+	return err
 }
 
 // MergeDuplicateShows folds rows that describe the same show (same TMDB id,

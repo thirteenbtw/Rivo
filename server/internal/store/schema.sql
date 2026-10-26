@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS torrent_progress (
   position   REAL NOT NULL DEFAULT 0,
   duration   REAL NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL,
+  watched    INTEGER NOT NULL DEFAULT 0, -- played to the end at least once
   PRIMARY KEY (profile_id, hash, file_idx)
 );
 

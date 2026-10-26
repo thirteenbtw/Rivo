@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"maps"
 	"net/http"
 	"strconv"
@@ -28,13 +29,15 @@ func (s *Server) addTorrent(w http.ResponseWriter, r *http.Request) error {
 	}
 	var source, mode, link string
 	var file []byte
-	keep := true
+	keep := s.Torrents.Settings().KeepWatched
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
 		if err := r.ParseMultipartForm(16 << 20); err != nil {
 			return badRequest("%v", err)
 		}
 		mode = r.FormValue("mode")
-		keep = r.FormValue("keep") != "0"
+		if v := r.FormValue("keep"); v != "" {
+			keep = v != "0"
+		}
 		source = r.FormValue("magnet")
 		if fh, _, err := r.FormFile("file"); err == nil {
 			file, _ = io.ReadAll(io.LimitReader(fh, 16<<20))
@@ -127,21 +130,7 @@ func (s *Server) deleteTorrent(w http.ResponseWriter, r *http.Request) error {
 	if _, err := s.Torrents.Get(hash); err != nil {
 		return notFound(err.Error())
 	}
-	if data {
-		// ffmpeg playing one of these files keeps it locked on Windows.
-		open := map[string]bool{}
-		for _, p := range s.Torrents.DataPaths(hash, lib) {
-			open[p] = true
-		}
-		s.Trans.StopWhere(func(in string) bool { return open[in] || strings.Contains(in, "/torrents/"+strings.ToLower(hash)+"/") })
-	}
-	err := s.Torrents.Remove(hash, data, lib)
-	if err == nil {
-		_ = s.Store.ForgetTorrentProgress(hash)
-	}
-	if data && lib {
-		s.Scanner.RequestScan(0) // drop the deleted copies from the library
-	}
+	err := s.removeTorrent(hash, data, lib)
 	var pe *torrent.PendingError
 	if errors.As(err, &pe) {
 		return writeJSON(w, map[string]any{"ok": true, "pending": pe.Error()})
@@ -150,6 +139,74 @@ func (s *Server) deleteTorrent(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return writeJSON(w, map[string]bool{"ok": true})
+}
+
+// torrentReaders matches the transcoder inputs that read a torrent's files.
+func (s *Server) torrentReaders(hash string, lib bool) func(string) bool {
+	open := map[string]bool{}
+	for _, p := range s.Torrents.DataPaths(hash, lib) {
+		open[p] = true
+	}
+	return func(in string) bool { return open[in] || strings.Contains(in, "/torrents/"+strings.ToLower(hash)+"/") }
+}
+
+// removeTorrent drops a torrent; files still open elsewhere come back as a
+// *torrent.PendingError and are deleted once released.
+func (s *Server) removeTorrent(hash string, data, lib bool) error {
+	if data {
+		// ffmpeg playing one of these files keeps it locked on Windows.
+		s.Trans.StopWhere(s.torrentReaders(hash, lib))
+	}
+	err := s.Torrents.Remove(hash, data, lib)
+	var pe *torrent.PendingError
+	if err == nil || errors.As(err, &pe) {
+		_ = s.Store.ForgetTorrentProgress(hash)
+	}
+	if data && lib && s.Scanner != nil {
+		s.Scanner.RequestScan(0) // drop the deleted copies from the library
+	}
+	return err
+}
+
+// watchedIdle is how long a watched torrent stays after the player let go of
+// it, so closing and reopening the player (or a seek) does not lose it.
+var watchedIdle = 2 * time.Minute
+
+// removeWatchedLoop deletes the torrents not kept after watching once every
+// video file in them has been played to the end and nothing reads them.
+func (s *Server) removeWatchedLoop() {
+	for {
+		time.Sleep(30 * time.Second)
+		s.removeWatched()
+	}
+}
+
+func (s *Server) removeWatched() {
+	for _, d := range s.Torrents.Disposables(watchedIdle) {
+		watched, last := s.Store.TorrentWatched(d.Hash)
+		if time.Since(time.Unix(last, 0)) < watchedIdle || !allWatched(d.Files, watched) || s.Trans.Uses(s.torrentReaders(d.Hash, true)) {
+			continue
+		}
+		err := s.removeTorrent(d.Hash, true, true)
+		var pe *torrent.PendingError
+		switch {
+		case errors.As(err, &pe):
+			log.Printf("torrent %s watched, removed; queued for deletion: %v", d.Hash, pe)
+		case err != nil:
+			log.Printf("torrent %s watched, remove: %v", d.Hash, err)
+		default:
+			log.Printf("torrent %s watched, removed with its files", d.Hash)
+		}
+	}
+}
+
+func allWatched(files []int, watched map[int]bool) bool {
+	for _, f := range files {
+		if !watched[f] {
+			return false
+		}
+	}
+	return len(files) > 0
 }
 
 // torrentDisk reports the files in the download folder no torrent owns.
