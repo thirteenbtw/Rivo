@@ -223,12 +223,19 @@ func (m *Manager) Start(o Options) (*Session, error) {
 	s.cmd = cmd
 	m.sessions[id] = s
 	m.mu.Unlock()
-	go s.readProgress(stderr)
 	go func() {
-		s.err = cmd.Wait()
+		// Read stderr to the end before Wait, which closes the pipe.
+		tail := s.readProgress(stderr)
+		err := cmd.Wait()
+		if err != nil && tail != "" {
+			err = fmt.Errorf("%w: %s", err, tail)
+		}
+		s.mu.Lock()
+		s.err = err
+		s.mu.Unlock()
 		close(s.done)
-		if s.err != nil && ctx.Err() == nil {
-			log.Printf("ffmpeg session %s failed: %v", id, s.err)
+		if err != nil && ctx.Err() == nil {
+			log.Printf("ffmpeg session %s failed: %v\nargs: %q", id, err, args)
 		}
 	}()
 	return s, nil
@@ -236,7 +243,8 @@ func (m *Manager) Start(o Options) (*Session, error) {
 
 var reSpeed = regexp.MustCompile(`speed=\s*([\d.]+)x`)
 
-func (s *Session) readProgress(r io.Reader) {
+// readProgress tracks the encoding speed and returns ffmpeg's last messages.
+func (s *Session) readProgress(r io.Reader) string {
 	sc := bufio.NewScanner(r)
 	sc.Split(scanCRLF)
 	var tail []string
@@ -254,13 +262,7 @@ func (s *Session) readProgress(r io.Reader) {
 			}
 		}
 	}
-	if len(tail) > 0 {
-		s.mu.Lock()
-		if s.err == nil {
-			s.err = errors.New(strings.Join(tail, "\n"))
-		}
-		s.mu.Unlock()
-	}
+	return strings.Join(tail, "\n")
 }
 
 func scanCRLF(data []byte, atEOF bool) (int, []byte, error) {
@@ -292,7 +294,14 @@ func (m *Manager) buildArgs(o Options, dir string) []string {
 			args = append(args, "-noaccurate_seek")
 		}
 	}
-	args = append(args, "-i", o.Input, "-map", "0:v:0")
+	args = append(args, "-i", o.Input)
+	// Picture subtitles (PGS, VobSub) are overlaid from the same input: the
+	// subtitles filter takes text only, and it would demux the whole file up
+	// front, which for a torrent stream means the whole download.
+	overlay := !o.CopyVideo && o.BurnSub != nil && o.BurnSub.External == "" && isBitmapSub(o.BurnSub.Codec)
+	if !overlay {
+		args = append(args, "-map", "0:v:0")
+	}
 	if o.Audio >= 0 {
 		args = append(args, "-map", fmt.Sprintf("0:%d", o.Audio))
 	} else {
@@ -311,14 +320,21 @@ func (m *Manager) buildArgs(o Options, dir string) []string {
 		if target > 0 && (o.Height == 0 || o.Height > target) {
 			vf = append(vf, fmt.Sprintf("scale=-2:%d", target))
 		}
-		if o.BurnSub != nil {
+		if o.BurnSub != nil && !overlay {
 			vf = append(vf, burnFilter(o))
 		}
 		vf = append(vf, "format=yuv420p")
 		if enc == "vaapi" {
 			vf = append(vf, "format=nv12", "hwupload")
 		}
-		args = append(args, "-vf", strings.Join(vf, ","))
+		if overlay {
+			// Overlay first: the subtitle canvas matches the source picture.
+			args = append(args, "-filter_complex",
+				fmt.Sprintf("[0:v:0][0:s:%d]overlay=eof_action=pass,%s[v]", o.BurnSubPos, strings.Join(vf, ",")),
+				"-map", "[v]")
+		} else {
+			args = append(args, "-vf", strings.Join(vf, ","))
+		}
 		bitrate := map[string]string{"1080p": "8M", "720p": "4M", "480p": "2M"}[o.Quality]
 		if bitrate == "" {
 			bitrate = "12M"
