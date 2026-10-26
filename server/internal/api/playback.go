@@ -211,6 +211,8 @@ type playback struct {
 	Title    string     `json:"title"`
 	Info     string     `json:"info"`
 	External bool       `json:"external"`
+	// TorrentFile is the file index a torrent stream resolved to.
+	TorrentFile int `json:"torrentFile"`
 }
 
 // playInfo decides direct play vs HLS for one file and returns URLs (FR-8).

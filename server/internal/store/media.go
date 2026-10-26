@@ -770,6 +770,32 @@ func (s *Store) Progress(profile, item int64) (*Progress, error) {
 	return &p, err
 }
 
+// SaveTorrentProgress remembers where a torrent file was left; a file played
+// to the end starts over next time.
+func (s *Store) SaveTorrentProgress(profile int64, hash string, file int, position, duration float64) error {
+	if duration > 0 && position/duration >= 0.97 {
+		position = 0
+	}
+	_, err := s.Exec(`INSERT INTO torrent_progress(profile_id, hash, file_idx, position, duration, updated_at) VALUES(?,?,?,?,?,?)
+		ON CONFLICT(profile_id, hash, file_idx) DO UPDATE SET position=excluded.position,
+		duration=CASE WHEN excluded.duration>0 THEN excluded.duration ELSE duration END, updated_at=excluded.updated_at`,
+		profile, strings.ToLower(hash), file, position, duration, now())
+	return err
+}
+
+// TorrentProgress is the saved position in a torrent file, 0 when none.
+func (s *Store) TorrentProgress(profile int64, hash string, file int) float64 {
+	var pos float64
+	_ = s.DB.QueryRow(`SELECT position FROM torrent_progress WHERE profile_id=? AND hash=? AND file_idx=?`, profile, strings.ToLower(hash), file).Scan(&pos)
+	return pos
+}
+
+// ForgetTorrentProgress drops saved positions of a removed torrent.
+func (s *Store) ForgetTorrentProgress(hash string) error {
+	_, err := s.Exec(`DELETE FROM torrent_progress WHERE hash=?`, strings.ToLower(hash))
+	return err
+}
+
 func (s *Store) SetList(profile int64, list string, itemID, showID int64, on bool) error {
 	if list != "favorites" && list != "later" {
 		return fmt.Errorf("unknown list %q", list)

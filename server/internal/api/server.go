@@ -161,6 +161,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	h("DELETE /api/torrents/{hash}", s.deleteTorrent)
 	h("GET /api/torrents/{hash}/stream", s.torrentStream)
 	h("GET /api/torrents/{hash}/play", s.torrentPlay)
+	h("POST /api/torrents/{hash}/progress", s.torrentProgress)
 	mux.HandleFunc("GET /api/torrents/{hash}/files/{idx}", s.torrentFile)
 	mux.HandleFunc("GET /api/torrents/{hash}/files/{idx}/subs/{n}", s.torrentSubtitle)
 	h("GET /api/indexers", s.getIndexers)
