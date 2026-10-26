@@ -35,6 +35,7 @@ export type PlayTrack = { index: number; label: string; name?: string; meta?: st
 export type Playback = {
   mode: 'direct' | 'hls'; url: string; offset: number; start: number; duration: number; session?: string; reason?: string;
   summary: string; encoder?: string; audio: PlayTrack[]; subs: PlayTrack[]; fileId: number; itemId: number; title: string; info: string; external: boolean;
+  torrentFile: number;
 };
 export type Compat = { name: string; mode: string; status: 'direct' | 'transcode' };
 export type TorrentFile = { index: number; path: string; size: number; progress: number; wanted: boolean; video: boolean; blocked: boolean };

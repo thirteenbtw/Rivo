@@ -2,11 +2,12 @@ package api
 
 import (
 	"context"
-	"errors"
 	"crypto/sha1"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -135,6 +136,9 @@ func (s *Server) deleteTorrent(w http.ResponseWriter, r *http.Request) error {
 		s.Trans.StopWhere(func(in string) bool { return open[in] || strings.Contains(in, "/torrents/"+strings.ToLower(hash)+"/") })
 	}
 	err := s.Torrents.Remove(hash, data, lib)
+	if err == nil {
+		_ = s.Store.ForgetTorrentProgress(hash)
+	}
 	if data && lib {
 		s.Scanner.RequestScan(0) // drop the deleted copies from the library
 	}
@@ -203,8 +207,9 @@ func (s *Server) loopbackBase() string {
 
 // torrentPlayback prepares a torrent file for playback while it downloads
 // (FR-T4): direct when the client can decode it, otherwise HLS over the
-// partially downloaded file (FR-T5).
-func (s *Server) torrentPlayback(ctx context.Context, hash string, idx int, caps rendererCaps, q map[string][]string) (*playback, error) {
+// partially downloaded file (FR-T5). Without a start in q it resumes where
+// the profile left the file (profile 0: from the beginning).
+func (s *Server) torrentPlayback(ctx context.Context, hash string, idx int, caps rendererCaps, q map[string][]string, profile int64) (*playback, error) {
 	if err := s.Torrents.WaitInfo(hash, 60*time.Second); err != nil {
 		return nil, badRequest("%v", err)
 	}
@@ -220,6 +225,12 @@ func (s *Server) torrentPlayback(ctx context.Context, hash string, idx int, caps
 	if err != nil {
 		return nil, badRequest("%v", err)
 	}
+	if _, ok := q["start"]; !ok && profile > 0 {
+		if pos := s.Store.TorrentProgress(profile, hash, idx); pos > 0 && (f.Duration == 0 || pos < f.Duration-5) {
+			q = maps.Clone(q)
+			q["start"] = []string{strconv.FormatFloat(pos, 'f', 3, 64)}
+		}
+	}
 	f.ID = torrentFileID(hash, idx)
 	f.Size = size
 	f.Container = containerFromName(name, f.Container)
@@ -233,6 +244,7 @@ func (s *Server) torrentPlayback(ctx context.Context, hash string, idx int, caps
 			pb.Subs[i].URL = fmt.Sprintf("/api/torrents/%s/files/%d/subs/%d", strings.ToLower(hash), idx, pb.Subs[i].Index)
 		}
 	}
+	pb.TorrentFile = idx
 	pb.Title = name
 	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
 		pb.Title = name[i+1:]
@@ -285,11 +297,34 @@ func containerFromName(name, probed string) string {
 }
 
 func (s *Server) torrentPlay(w http.ResponseWriter, r *http.Request) error {
-	pb, err := s.torrentPlayback(r.Context(), r.PathValue("hash"), queryInt(r, "file", -1), browserCaps(r), r.URL.Query())
+	pb, err := s.torrentPlayback(r.Context(), r.PathValue("hash"), queryInt(r, "file", -1), browserCaps(r), r.URL.Query(), s.profileID(r))
 	if err != nil {
 		return err
 	}
 	return writeJSON(w, pb)
+}
+
+// torrentProgress saves the player's position in a torrent file.
+func (s *Server) torrentProgress(w http.ResponseWriter, r *http.Request) error {
+	pid, err := s.requireProfile(r)
+	if err != nil {
+		return err
+	}
+	var b struct {
+		File     int     `json:"file"`
+		Position float64 `json:"position"`
+		Duration float64 `json:"duration"`
+	}
+	if err := readJSON(r, &b); err != nil {
+		return err
+	}
+	if b.File < 0 {
+		return badRequest("нет файла")
+	}
+	if err := s.Store.SaveTorrentProgress(pid, r.PathValue("hash"), b.File, b.Position, b.Duration); err != nil {
+		return err
+	}
+	return writeJSON(w, map[string]bool{"ok": true})
 }
 
 func (s *Server) searchTorrents(w http.ResponseWriter, r *http.Request) error {

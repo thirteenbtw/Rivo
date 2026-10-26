@@ -66,10 +66,14 @@ export default function Player() {
   const duration = pb?.duration || video.current?.duration || 0;
 
   // Load (or reload, after an audio switch or a far seek) the playback session.
+  // A torrent stream opened without a start resumes where it was left (the
+  // server knows the position); later reloads always name their position.
+  const loaded = useRef(false);
   const load = useCallback(async (start: number) => {
     setErr(null); setWaiting(true);
     const q = new URLSearchParams(clientCaps());
-    if (start > 0) q.set('start', String(Math.floor(start)));
+    if (start > 0 || (hash && loaded.current)) q.set('start', String(Math.floor(start)));
+    loaded.current = true;
     if (opts.current.audio !== '') q.set('audio', opts.current.audio);
     if (opts.current.burn) { q.set('sub', opts.current.burn); q.set('burn', '1'); }
     if (opts.current.nodirect) q.set('nodirect', '1');
@@ -192,16 +196,19 @@ export default function Player() {
     return () => { stop = true; clearInterval(id); };
   }, [hash, torrentFile]);
 
+  const tfile = hash ? pb?.torrentFile ?? -1 : -1;
   const saveProgress = useCallback((force = false) => {
-    if (!itemId || !duration) return;
+    if ((!itemId && tfile < 0) || !duration || cur <= 0) return;
     const now = Date.now();
     if (!force && now - lastSaved.current < 10000) return;
     lastSaved.current = now;
-    fetch(`/api/items/${itemId}/progress`, {
+    const [url, body] = itemId ? [`/api/items/${itemId}/progress`, { position: cur, duration, device: 'pc' }]
+      : [`/api/torrents/${hash}/progress`, { file: tfile, position: cur, duration }];
+    fetch(url, {
       method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
-      body: JSON.stringify({ position: cur, duration, device: 'pc' }),
+      body: JSON.stringify(body),
     }).catch(() => {});
-  }, [itemId, cur, duration]);
+  }, [itemId, hash, tfile, cur, duration]);
 
   useEffect(() => { if (!paused) saveProgress(); }, [cur, paused, saveProgress]);
   useEffect(() => {
@@ -327,12 +334,12 @@ export default function Player() {
           <span style={{ fontSize: 'calc(14px * var(--fs))', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pb?.title || tr('Загрузка…', 'Loading…')}</span>
           <span style={{ fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }} title={pb?.reason}>{pb ? [pb.info || pb.summary, pb.encoder && pb.mode === 'hls' ? pb.encoder.toUpperCase() : ''].filter(Boolean).join(' · ') : ''}</span>
         </div>
-        {itemId > 0 && (
+        {(itemId > 0 || tfile >= 0) && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', borderRadius: 999, background: '#FFFFFF1A', fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC', whiteSpace: 'nowrap' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3CCB7F' }} />{tr('Позиция сохраняется · синхр. с ТВ', 'Position is saved · synced with TV')}
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3CCB7F' }} />{itemId ? tr('Позиция сохраняется · синхр. с ТВ', 'Position is saved · synced with TV') : tr('Позиция сохраняется', 'Position is saved')}
           </span>
         )}
-        <button className="pb" onClick={close} aria-label={tr('Закрыть плеер', 'Close player')} style={{ background: '#FFFFFF1A', marginLeft: itemId ? 0 : 'auto', flex: 'none' }}><Icon name="close" size={18} /></button>
+        <button className="pb" onClick={close} aria-label={tr('Закрыть плеер', 'Close player')} style={{ background: '#FFFFFF1A', marginLeft: itemId || tfile >= 0 ? 0 : 'auto', flex: 'none' }}><Icon name="close" size={18} /></button>
       </header>
 
       {(waiting || !pb) && !err && (

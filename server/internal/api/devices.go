@@ -91,7 +91,7 @@ func (s *Server) castLoad(w http.ResponseWriter, r *http.Request) error {
 	itemID := int64(0)
 	title := ""
 	if b.Torrent != "" {
-		pb, err = s.torrentPlayback(r.Context(), b.Torrent, b.File, dev.Caps, q)
+		pb, err = s.torrentPlayback(r.Context(), b.Torrent, b.File, dev.Caps, q, 0)
 		if err != nil {
 			return err
 		}

@@ -91,6 +91,18 @@ CREATE TABLE IF NOT EXISTS watch_progress (
   PRIMARY KEY (profile_id, item_id)
 );
 
+-- Position in a torrent file watched while it downloads: it has no library
+-- item yet, so it is keyed by the torrent and the file index.
+CREATE TABLE IF NOT EXISTS torrent_progress (
+  profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  hash       TEXT NOT NULL,
+  file_idx   INTEGER NOT NULL,
+  position   REAL NOT NULL DEFAULT 0,
+  duration   REAL NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, hash, file_idx)
+);
+
 CREATE TABLE IF NOT EXISTS lists (
   profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   list       TEXT NOT NULL,   -- favorites | later
