@@ -55,7 +55,8 @@ type Session struct {
 	lastSeen time.Time
 	done     chan struct{}
 	err      error
-	Speed    float64 // encoding speed, x realtime
+	start    *float64 // measured by StartTime
+	Speed    float64  // encoding speed, x realtime
 }
 
 func (s *Session) touch() {
@@ -290,8 +291,11 @@ func (m *Manager) buildArgs(o Options, dir string) []string {
 		args = append(args, "-ss", strconv.FormatFloat(o.Start, 'f', 3, 64))
 		if o.CopyVideo {
 			// Copied video starts on the keyframe before Start; without this the
-			// audio would start seconds later and play out of sync.
-			args = append(args, "-noaccurate_seek")
+			// audio would start seconds later and play out of sync. That keyframe
+			// is up to a GOP (often several seconds) before Start, so timestamps
+			// stay in movie time and the session reads where it really begins
+			// from its first segment (see StartTime).
+			args = append(args, "-noaccurate_seek", "-copyts", "-start_at_zero")
 		}
 	}
 	args = append(args, "-i", o.Input)
@@ -360,49 +364,15 @@ func (m *Manager) buildArgs(o Options, dir string) []string {
 		// damaged spot in a partly downloaded file instead of garbling sound.
 		args = append(args, "-af", "aresample=async=1000", "-c:a", "aac", "-ac", "2", "-b:a", "192k")
 	}
+	if o.CopyVideo && o.Start > 0 {
+		args = append(args, "-muxdelay", "0", "-muxpreload", "0") // PTS = movie time
+	}
 	args = append(args,
 		"-f", "hls", "-hls_time", "4", "-hls_list_size", "0", "-hls_playlist_type", "event",
 		"-hls_flags", "independent_segments+temp_file",
 		"-hls_segment_filename", filepath.Join(dir, "seg%05d.ts"),
 		filepath.Join(dir, "index.m3u8"))
 	return args
-}
-
-var reFrame = regexp.MustCompile(`(?m)^0,\s*(-?\d+),`)
-var reTimebase = regexp.MustCompile(`(?m)^#tb 0: (\d+)/(\d+)`)
-
-// KeyframeBefore returns the position of the video keyframe that a seek to t
-// lands on when the video is stream-copied.
-func (m *Manager) KeyframeBefore(ctx context.Context, input string, t float64) (float64, bool) {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	args := []string{"-hide_banner", "-v", "error", "-nostdin"}
-	if strings.HasPrefix(input, "http") {
-		args = append(args, "-reconnect", "1", "-reconnect_streamed", "1")
-	}
-	args = append(args, "-ss", strconv.FormatFloat(t, 'f', 3, 64), "-noaccurate_seek", "-copyts", "-start_at_zero",
-		"-i", input, "-map", "0:v:0", "-c", "copy", "-frames:v", "1", "-f", "framecrc", "-")
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
-	probe.HideWindow(cmd)
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, false
-	}
-	return parseFramePTS(string(out))
-}
-
-func parseFramePTS(out string) (float64, bool) {
-	tb, fr := reTimebase.FindStringSubmatch(out), reFrame.FindStringSubmatch(out)
-	if tb == nil || fr == nil {
-		return 0, false
-	}
-	num, _ := strconv.ParseFloat(tb[1], 64)
-	den, _ := strconv.ParseFloat(tb[2], 64)
-	pts, _ := strconv.ParseFloat(fr[1], 64)
-	if den == 0 {
-		return 0, false
-	}
-	return max(pts*num/den, 0), true
 }
 
 func burnFilter(o Options) string {
@@ -418,6 +388,62 @@ func burnFilter(o Options) string {
 	}
 	// si counts subtitle streams only, not absolute stream indexes.
 	return fmt.Sprintf("subtitles=%s:si=%d", esc(o.Input), o.BurnSubPos)
+}
+
+// StartTime returns the movie position a stream-copy session really starts
+// at: the earliest timestamp of its first segment, which is where the player's
+// clock starts (hls.js maps it to 0).
+func (s *Session) StartTime(ctx context.Context) (float64, bool) {
+	s.mu.Lock()
+	if s.start != nil {
+		defer s.mu.Unlock()
+		return *s.start, true
+	}
+	s.mu.Unlock()
+	p, err := s.WaitFile(ctx, "seg00000.ts")
+	if err != nil {
+		return 0, false
+	}
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return 0, false
+	}
+	t, ok := firstPTS(b)
+	if ok {
+		s.mu.Lock()
+		s.start = &t
+		s.mu.Unlock()
+	}
+	return t, ok
+}
+
+// firstPTS returns the smallest audio or video PES timestamp in an MPEG-TS
+// segment, in seconds.
+func firstPTS(b []byte) (float64, bool) {
+	best, found := int64(0), false
+	for i := 0; i+188 <= len(b); i += 188 {
+		pkt := b[i : i+188]
+		if pkt[0] != 0x47 || pkt[1]&0x40 == 0 { // sync byte, payload unit start
+			continue
+		}
+		off := 4
+		if pkt[3]&0x20 != 0 { // adaptation field
+			off += 1 + int(pkt[4])
+		}
+		if pkt[3]&0x10 == 0 || off+14 > len(pkt) {
+			continue
+		}
+		pes := pkt[off:]
+		sid := pes[3]
+		if pes[0] != 0 || pes[1] != 0 || pes[2] != 1 || !(sid >= 0xC0 && sid <= 0xEF || sid == 0xBD) || pes[7]&0x80 == 0 {
+			continue
+		}
+		pts := int64(pes[9]>>1&0x07)<<30 | int64(pes[10])<<22 | int64(pes[11]>>1)<<15 | int64(pes[12])<<7 | int64(pes[13]>>1)
+		if !found || pts < best {
+			best, found = pts, true
+		}
+	}
+	return float64(best) / 90000, found
 }
 
 // Get returns a session and marks it as in use.
