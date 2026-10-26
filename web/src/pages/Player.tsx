@@ -59,6 +59,7 @@ export default function Player() {
   const [autoNext, setAutoNext] = useState(true);
   const lastSaved = useRef(0);
   const idleTimer = useRef<number>();
+  const overBars = useRef(false);
   const startAt = useRef(Number(params.get('start') || 0));
   const opts = useRef({ audio: params.get('audio') ?? '', burn: '', nodirect: false });
 
@@ -273,9 +274,21 @@ export default function Player() {
   const wake = () => {
     setIdle(false);
     window.clearTimeout(idleTimer.current);
-    idleTimer.current = window.setTimeout(() => setIdle(true), 3000);
+    idleTimer.current = window.setTimeout(() => { if (!overBars.current) setIdle(true); }, 3000);
   };
-  useEffect(() => () => window.clearTimeout(idleTimer.current), []);
+  // Listen on the document, not the player div: in fullscreen (WebView2 in
+  // particular) mouse events don't always reach the React handler on the
+  // fullscreen element, and the controls would never come back.
+  useEffect(() => {
+    const evs = ['pointermove', 'mousemove', 'pointerdown', 'wheel', 'touchstart'];
+    evs.forEach((e) => document.addEventListener(e, wake, { capture: true, passive: true }));
+    document.addEventListener('fullscreenchange', wake);
+    return () => {
+      evs.forEach((e) => document.removeEventListener(e, wake, { capture: true }));
+      document.removeEventListener('fullscreenchange', wake);
+      window.clearTimeout(idleTimer.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Next episode countdown.
   useEffect(() => {
@@ -321,7 +334,7 @@ export default function Player() {
   };
 
   return (
-    <div ref={root} className="player" onMouseMove={wake} style={{ position: 'fixed', inset: 0, background: '#000000', color: '#FFFFFF', zIndex: 40, cursor: showUI ? 'default' : 'none', fontFamily: "'Inter',sans-serif" }}>
+    <div ref={root} className="player" style={{ position: 'fixed', inset: 0, background: '#000000', color: '#FFFFFF', zIndex: 40, cursor: showUI ? 'default' : 'none', fontFamily: "'Inter',sans-serif" }}>
       <video ref={video} playsInline onClick={toggle} onDoubleClick={fullscreen}
         onTimeUpdate={onTime} onPlay={() => setPaused(false)} onPause={() => { setPaused(true); saveProgress(true); }}
         onWaiting={() => setWaiting(true)} onPlaying={() => setWaiting(false)} onCanPlay={() => setWaiting(false)}
@@ -329,7 +342,7 @@ export default function Player() {
         onError={() => { if (!hlsRef.current && !directFailed()) setErr(tr('Браузер не смог открыть файл. Попробуйте внешний плеер или отправьте на ТВ.', 'The browser could not open this file.')); }}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000000' }} />
 
-      <header style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 64, display: 'flex', alignItems: 'center', gap: 16, padding: '0 20px', background: 'linear-gradient(#000000E6,#00000000)', opacity: showUI ? 1 : 0, transition: 'opacity .3s' }}>
+      <header onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 64, display: 'flex', alignItems: 'center', gap: 16, padding: '0 20px', background: 'linear-gradient(#000000E6,#00000000)', opacity: showUI ? 1 : 0, transition: 'opacity .3s' }}>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: 'calc(14px * var(--fs))', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pb?.title || tr('Загрузка…', 'Loading…')}</span>
           <span style={{ fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }} title={pb?.reason}>{pb ? [pb.info || pb.summary, pb.encoder && pb.mode === 'hls' ? pb.encoder.toUpperCase() : ''].filter(Boolean).join(' · ') : ''}</span>
@@ -418,7 +431,7 @@ export default function Player() {
         </section>
       )}
 
-      <footer style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 20px', background: 'linear-gradient(#00000000,#000000E6 40%)', display: 'flex', flexDirection: 'column', gap: 8, opacity: showUI ? 1 : 0, transition: 'opacity .3s', paddingTop: 32 }}>
+      <footer onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 20px', background: 'linear-gradient(#00000000,#000000E6 40%)', display: 'flex', flexDirection: 'column', gap: 8, opacity: showUI ? 1 : 0, transition: 'opacity .3s', paddingTop: 32 }}>
         {stream && (
           <div style={{ display: 'flex', gap: 14, fontSize: 'calc(11px * var(--fs))', color: '#A9ADB4' }} className="mono">
             <span>{tr('Загружено', 'Downloaded')} {Math.round(stream.progress * 100)}%</span><span>↓ {fmtSize(stream.down)}/s</span><span>{stream.seeds} {tr('сидов', 'seeds')} · {stream.peers} {tr('пиров', 'peers')}</span>
