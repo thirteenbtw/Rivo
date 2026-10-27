@@ -248,7 +248,7 @@ function Detail({ d }: { d: TitleResp }) {
           <p style={{ margin: 0, fontSize: 'calc(14px * var(--fs))', lineHeight: 1.6 }}>{tr('Торрент-клиент скачивает и одновременно раздаёт данные другим участникам. Ответственность за законность загружаемого и раздаваемого контента лежит на вас. Рекомендуем привязать клиент к VPN в настройках — тогда при обрыве VPN загрузки остановятся.', 'The torrent client downloads and shares data with others at the same time. You are responsible for the legality of the content. We recommend binding the client to a VPN in Settings.')}</p>
           <div className="row">
             <button className="btn btn-r sm" onClick={acceptRisk}>{tr('Понимаю, продолжить', 'I understand, continue')}</button>
-            <Link className="btn btn-l sm" to="/settings#torrents">{tr('Настроить VPN', 'Set up VPN')}</Link>
+            <Link className="btn btn-l sm" to="/settings#net">{tr('Настроить VPN', 'Set up VPN')}</Link>
           </div>
         </Modal>
       )}

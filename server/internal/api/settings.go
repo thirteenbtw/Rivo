@@ -23,9 +23,11 @@ import (
 	"github.com/thirteenbtw/homecinema/server/internal/torrent"
 )
 
-var generalKeys = []string{"metaLang", "uiLang", "hwaccel", "quality", "maxStreams", "tonemap", "externalPlayer", "useExternal", "setupDone", "subLang", "autoNext", "tmdbApi", "tmdbImg", "tmdbVia"}
+var generalKeys = []string{"metaLang", "uiLang", "hwaccel", "quality", "maxStreams", "tonemap", "externalPlayer", "useExternal", "setupDone", "subLang", "autoNext", "tmdbApi", "tmdbImg", "tmdbVia",
+	"audioLang", "watchedAt", "playerKind", "watchFS", "scanOnStart", "askProfile", "autoBackup"}
 
-var generalDefaults = map[string]string{"metaLang": "ru-RU", "uiLang": "ru", "hwaccel": "auto", "quality": "original", "maxStreams": "2", "tonemap": "1", "useExternal": "", "setupDone": "", "subLang": "rus", "autoNext": "1", "tmdbVia": "cub"}
+var generalDefaults = map[string]string{"metaLang": "ru-RU", "uiLang": "ru", "hwaccel": "auto", "quality": "original", "maxStreams": "2", "tonemap": "1", "useExternal": "", "setupDone": "", "subLang": "rus", "autoNext": "1", "tmdbVia": "cub",
+	"audioLang": "", "watchedAt": "90", "playerKind": "builtin", "watchFS": "1", "scanOnStart": "1", "askProfile": "", "autoBackup": ""}
 
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) error {
 	out := map[string]any{}
@@ -115,11 +117,13 @@ func (s *Server) libraries(w http.ResponseWriter, r *http.Request) error {
 		Path   string `json:"path"`
 		Kind   string `json:"kind"`
 		Online bool   `json:"online"`
+		Files  int    `json:"files"`
 	}
 	out := []libOut{}
+	counts := s.Store.LibraryFileCounts()
 	for _, l := range libs {
 		_, err := os.Stat(l.Path)
-		out = append(out, libOut{l.ID, l.Path, l.Kind, err == nil})
+		out = append(out, libOut{l.ID, l.Path, l.Kind, err == nil, counts[l.ID]})
 	}
 	return writeJSON(w, map[string]any{"libraries": out, "scan": s.Scanner.Status()})
 }
@@ -343,6 +347,7 @@ func (s *Server) backup(w http.ResponseWriter, r *http.Request) error {
 	if err := s.Store.Backup(tmp); err != nil {
 		return err
 	}
+	s.markBackup()
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="rivo-%s.db"`, time.Now().Format("2006-01-02")))
 	http.ServeFile(w, r, tmp)

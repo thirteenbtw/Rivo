@@ -35,6 +35,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) error {
 		"lanUrls":      urls,
 		"uiLang":       s.Store.Setting("uiLang", "ru"),
 		"local":        netutil.IsLoopback(r),
+		"askProfile":   s.Store.Setting("askProfile", "") == "1",
 	}
 	if authed {
 		out["profiles"] = profiles

@@ -134,6 +134,24 @@ func (s *Store) FileByPath(path string) (*File, error) {
 	return f, nil
 }
 
+// LibraryFileCounts maps a library id to the number of files found in it.
+func (s *Store) LibraryFileCounts() map[int64]int {
+	out := map[int64]int{}
+	rows, err := s.DB.Query(`SELECT m.library_id, COUNT(*) FROM files f JOIN media_items m ON m.id=f.item_id GROUP BY m.library_id`)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var n int
+		if rows.Scan(&id, &n) == nil {
+			out[id] = n
+		}
+	}
+	return out
+}
+
 func (s *Store) AllFilePaths(libraryID int64) (map[string]int64, error) {
 	rows, err := s.DB.Query(`SELECT f.path, f.id FROM files f JOIN media_items m ON m.id=f.item_id WHERE m.library_id=?`, libraryID)
 	if err != nil {
@@ -721,8 +739,19 @@ func (s *Store) NextEpisode(profile, itemID int64) (*Item, error) {
 // WatchedThreshold: an item counts as watched once 90% has been played (FR-10).
 const WatchedThreshold = 0.9
 
+// watchedThreshold follows the "watchedAt" setting: 90, 95 or manual.
+func (s *Store) watchedThreshold() float64 {
+	switch s.Setting("watchedAt", "90") {
+	case "95":
+		return 0.95
+	case "manual":
+		return 2 // never reached: only the "watched" button marks it
+	}
+	return WatchedThreshold
+}
+
 func (s *Store) SaveProgress(profile, item int64, position, duration float64, device string) (bool, error) {
-	watched := duration > 0 && position/duration >= WatchedThreshold
+	watched := duration > 0 && position/duration >= s.watchedThreshold()
 	_, err := s.Exec(`INSERT INTO watch_progress(profile_id, item_id, position, duration, watched, device, plays, updated_at) VALUES(?,?,?,?,?,?,1,?)
 		ON CONFLICT(profile_id, item_id) DO UPDATE SET position=excluded.position, duration=CASE WHEN excluded.duration>0 THEN excluded.duration ELSE duration END,
 		watched=CASE WHEN excluded.watched=1 THEN 1 ELSE watched END, device=excluded.device, updated_at=excluded.updated_at,

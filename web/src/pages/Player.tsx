@@ -70,6 +70,7 @@ export default function Player() {
   // A torrent stream opened without a start resumes where it was left (the
   // server knows the position); later reloads always name their position.
   const loaded = useRef(false);
+  const subsPicked = useRef(false);
   const load = useCallback(async (start: number) => {
     setErr(null); setWaiting(true);
     const q = new URLSearchParams(clientCaps());
@@ -78,9 +79,16 @@ export default function Player() {
     if (opts.current.audio !== '') q.set('audio', opts.current.audio);
     if (opts.current.burn) { q.set('sub', opts.current.burn); q.set('burn', '1'); }
     if (opts.current.nodirect) q.set('nodirect', '1');
+    if (!subsPicked.current && params.get('sub') === null) q.set('autosub', '1');
     try {
       const url = hash ? `/api/torrents/${hash}/play?file=${torrentFile}&${q}` : `/api/play/${fileId}?${q}`;
       const p = await api.get<Playback>(url);
+      // The first answer carries the default subtitles (settings: language).
+      if (!subsPicked.current) {
+        subsPicked.current = true;
+        const d = params.get('sub') === null && p.subs.find((x) => x.selected && !x.bitmap);
+        if (d) setSubIdx(d.index);
+      }
       setPb((old) => {
         if (old?.session && old.session !== p.session) api.del(`/api/hls/${old.session}`).catch(() => {});
         return p;

@@ -29,6 +29,14 @@ export function Shell() {
   useEffect(() => installTorrentDrop(() => nav('/torrents')), [nav]);
   useEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
   useEffect(() => { loadMarks(); }, [profile?.id]);
+  // "Ask who's watching": once per app start, when there is a choice.
+  const { state } = useApp();
+  useEffect(() => {
+    if (!state?.askProfile || (state.profiles?.length || 0) < 2 || loc.pathname.startsWith('/play')) return;
+    try { if (sessionStorage.getItem('hc.asked')) return; sessionStorage.setItem('hc.asked', '1'); } catch { /* private mode */ }
+    if (loc.pathname !== '/profiles') nav('/profiles');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.askProfile]);
 
   const c = (prefs.posterTint && colors) || ['var(--acc)', 'var(--acc)'];
   const active = torrents?.items.filter((x) => ['downloading', 'streaming', 'meta'].includes(x.status)).length || 0;
@@ -43,8 +51,8 @@ export function Shell() {
 
   return (
     <AmbientCtx.Provider value={setColors}>
-      <div className={`app th-${theme} ac-${prefs.accent}`}>
-        {bgOn && <Dots mode={prefs.bg === 'static' ? 'static' : 'live'} intensity={prefs.intensity} colors={c} />}
+      <div className={`app th-${theme} ac-${prefs.accent}${prefs.calm ? ' calm' : ''}`}>
+        {bgOn && <Dots mode={prefs.bg === 'static' || prefs.calm ? 'static' : 'live'} intensity={prefs.intensity} colors={c} />}
         <nav aria-label={tr('Разделы', 'Sections')} style={{ flex: '0 0 64px', padding: '16px 10px', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'sticky', top: 0, height: 'var(--vh)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', zIndex: 2 }}>
           <Link to="/" aria-label="Rivo" className="nav-extra" style={{ display: 'grid', marginBottom: 16 }}>
             <AppMark size={34} />
