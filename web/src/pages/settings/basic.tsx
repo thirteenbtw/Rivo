@@ -28,8 +28,7 @@ export function Look({ st, save }: SectionProps) {
   const set = (p: Parameters<typeof setPrefs>[0]) => { setPrefs(p); track(new Promise((r) => setTimeout(r, 650))); };
   const [text, setText] = useState(textScale());
   const bgHint = {
-    live: tr('Точки подсвечиваются вокруг курсора и слегка двигаются', 'Dots light up around the cursor and drift a little'),
-    static: tr('Сетка точек стоит на месте и не отвлекает', 'The dot grid stays still and out of the way'),
+    static: tr('Неподвижная сетка точек, не отвлекает', 'A still dot grid that stays out of the way'),
     off: tr('Чистый цвет темы, без точек', 'Plain theme color, no dots'),
   }[prefs.bg];
   const setUi = async (l: string) => { await track(save({ uiLang: l })); setLang(l); await reload(); };
@@ -65,17 +64,14 @@ export function Look({ st, save }: SectionProps) {
         </Row>
         <Row title={tr('Задний фон', 'Background')} hint={bgHint}>
           <Seg label={tr('Задний фон', 'Background')} value={prefs.bg} onChange={(v) => set({ bg: v })}
-            options={[{ v: 'live', l: tr('Живой', 'Live') }, { v: 'static', l: tr('Статичный', 'Static') }, { v: 'off', l: tr('Выключен', 'Off') }]} />
+            options={[{ v: 'static', l: tr('Точки', 'Dots') }, { v: 'off', l: tr('Выключен', 'Off') }]} />
         </Row>
-        <Row title={tr('Яркость фона', 'Background brightness')} hint={tr('Насколько заметны точки и пятна за карточками', 'How visible the dots and glow behind cards are')} htmlFor="set-int">
+        <Row title={tr('Яркость фона', 'Background brightness')} hint={tr('Насколько заметны точки на фоне', 'How visible the background dots are')} htmlFor="set-int">
           <input id="set-int" className="rng" type="range" min={0} max={200} step={10} value={prefs.intensity} disabled={prefs.bg === 'off'}
             onChange={(e) => set({ intensity: Number(e.target.value) })} style={{ width: 180 }} />
           <span className="set-mono" style={{ minWidth: 44, textAlign: 'right', color: 'var(--mut2)' }}>{prefs.intensity}%</span>
         </Row>
-        <Row title={tr('Цвет фона под постер', 'Tint background with poster')} hint={tr('Фон окрашивается в цвета фильма, который открыт сейчас', 'The background takes the colors of the film on screen')}>
-          <Switch label={tr('Цвет фона под постер', 'Tint background with poster')} on={prefs.posterTint} onChange={(v) => set({ posterTint: v })} />
-        </Row>
-        <Row title={tr('Меньше анимации', 'Reduce motion')} hint={tr('Фон замирает, переходы становятся мгновенными', 'The background stops moving, transitions become instant')}>
+        <Row title={tr('Меньше анимации', 'Reduce motion')} hint={tr('Переходы и анимации становятся мгновенными', 'Transitions and animations become instant')}>
           <Switch label={tr('Меньше анимации', 'Reduce motion')} on={prefs.calm} onChange={(v) => set({ calm: v })} />
         </Row>
       </Group>

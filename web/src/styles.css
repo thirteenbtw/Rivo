@@ -61,12 +61,10 @@ a{color:var(--acct);text-decoration:none}a:hover{opacity:.8}
 .wm .o{display:inline-block;width:.56em;height:.56em;border-radius:50%;border:.15em solid currentColor;margin-left:.03em;position:relative;top:.02em}
 .mono{font-family:'JetBrains Mono',monospace}
 .sub{font-size:calc(12px * var(--fs));color:var(--mut)}
-.lay{transition:transform .25s ease-out}
 /* dotted background (components/Dots.tsx) */
-.dots{position:fixed;inset:0;pointer-events:none;overflow:hidden;--mx:50%;--my:30%;--glow:0}
+.dots{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .dots>div{position:absolute;inset:0;background-size:22px 22px;background-position:11px 11px}
 .dots-base{background-image:radial-gradient(circle,color-mix(in srgb,var(--fg) calc(var(--dot-a) * var(--k)),transparent) 1.1px,transparent 1.7px);-webkit-mask-image:linear-gradient(180deg,#000,#0000008C);mask-image:linear-gradient(180deg,#000,#0000008C)}
-.dots-tint{--tc:color-mix(in srgb,var(--t1) 80%,var(--fg));background-image:radial-gradient(circle,var(--tc) 1.3px,transparent 1.9px);opacity:min(1,var(--k));transition:opacity .5s}
 /* Loose text on the page gets a background-colored halo so the dots never run
    through it; inside cards and panels (which have their own fill) it is off. */
 .main{--surface:var(--bg)}
@@ -79,7 +77,6 @@ a{color:var(--acct);text-decoration:none}a:hover{opacity:.8}
 .tbl{background:var(--bg);border-radius:12px}
 /* whole 16:9 still on the right of a hero, fading into its blurred copy */
 .bd-img{position:absolute;top:0;right:0;height:100%;aspect-ratio:16/9;object-fit:cover;animation:fadein .8s;-webkit-mask-image:linear-gradient(90deg,#0000 0%,#000 32%);mask-image:linear-gradient(90deg,#0000 0%,#000 32%)}
-.dots-live .dots-t1{opacity:calc(var(--glow) * min(1,var(--k)));-webkit-mask-image:radial-gradient(circle 240px at var(--mx) var(--my),#000,#0000);mask-image:radial-gradient(circle 240px at var(--mx) var(--my),#000,#0000)}
 .topbar{position:sticky;top:0;z-index:15;padding-bottom:4px;pointer-events:none}
 .topbar>*{pointer-events:auto}
 .tb-side{transition:opacity .2s,transform .2s}
@@ -147,7 +144,7 @@ input[type=range].rng{accent-color:var(--acc)}
 
 /* the rail scrolls instead of shrinking its buttons when it is taller than the window */
 .app > nav > *{flex-shrink:0}
-@media (prefers-reduced-motion: reduce){.dots-tint,.lay{transition:none!important}}
+
 @media (max-width: 720px){
   .main{padding:0 16px 40px}
   .app > nav{position:fixed!important;bottom:0;left:0;right:0;flex-direction:row!important;height:64px!important;top:auto!important;border-right:0!important;border-top:1px solid var(--line);background:var(--bg);z-index:20;justify-content:space-around;padding:8px!important}
@@ -302,8 +299,6 @@ input[type=range].rng{accent-color:var(--acc)}
 .set-check{display:flex;align-items:center;gap:14px;padding:12px 20px;min-height:64px;flex-wrap:wrap}
 .set-check+.set-check{border-top:1px solid var(--line)}
 .set-mark{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:calc(13px * var(--fs));flex:none}
-.set-blobs{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:-1}
 .set-link{border:0;background:none;padding:0;min-height:24px;color:var(--acct);font:600 calc(12.5px * var(--fs)) 'Inter',sans-serif;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-.set-blobs>span{position:absolute;border-radius:50%;filter:blur(70px);opacity:var(--amb);transition:transform 1.2s cubic-bezier(.2,.7,.2,1)}
 .app.calm *,.app.calm *::before,.app.calm *::after{transition-duration:0s!important;animation-duration:0s!important;animation-iteration-count:1!important}
 .app.calm .spin{animation-duration:1.2s!important;animation-iteration-count:infinite!important}

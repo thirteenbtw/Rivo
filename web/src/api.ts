@@ -25,7 +25,7 @@ export type Show = {
   seasons?: { number: number; episodes: Item[] }[];
 };
 export type Profile = { id: number; name: string; hasPin: boolean; color: string; prefs: Prefs; isKid: boolean };
-export type Prefs = { theme?: 'light' | 'dark' | 'oled'; accent?: 'iris' | 'mint' | 'red' | 'amber' | 'blue' | 'green'; bg?: 'live' | 'static' | 'off'; intensity?: number; posterTint?: boolean; trailers?: boolean; calm?: boolean };
+export type Prefs = { theme?: 'light' | 'dark' | 'oled'; accent?: 'iris' | 'mint' | 'red' | 'amber' | 'blue' | 'green'; bg?: 'static' | 'off'; intensity?: number; posterTint?: boolean; trailers?: boolean; calm?: boolean };
 export type ScanStatus = { scanning: boolean; library: string; done: number; total: number; added: number; movies: number; shows: number; matching: number; error?: string };
 export type AppState = {
   version: string; setupDone: boolean; authRequired: boolean; lanUrls: string[]; uiLang: string; local: boolean; askProfile?: boolean;

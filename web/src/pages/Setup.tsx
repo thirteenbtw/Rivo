@@ -11,7 +11,7 @@ function Frame({ children }: { children: ReactNode }) {
   const { prefs } = useApp();
   return (
     <div className={`app th-${prefs.theme} ac-${prefs.accent}`} style={{ alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <Dots mode="static" intensity={100} colors={['var(--acc)', 'var(--acc)']} />
+      <Dots intensity={100} />
       <div className="glass" style={{ position: 'relative', width: 'min(620px,100%)', borderRadius: 24, border: '1px solid var(--line)', boxShadow: '0 30px 80px var(--sh)', padding: 28, display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <AppMark size={34} />

@@ -33,15 +33,13 @@ export function ShowPage() {
 type DetailProps = { kind: 'movie' | 'show'; item?: Item; show?: Show; nextUp?: Item | null; similar?: Title[]; compat?: Compat[]; reload: () => void };
 
 function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }: DetailProps) {
-  const { prefs, openCast, toast } = useApp();
+  const { openCast, toast } = useApp();
   const nav = useNavigate();
   const setAmbient = useAmbient();
-  const [par, setPar] = useState({ x: 0, y: 0, sx: 0, sy: 0, hover: false });
   const [audio, setAudio] = useState<number | undefined>(undefined);
   const [sub, setSub] = useState<number>(-1);
   const [matching, setMatching] = useState(false);
   const [season, setSeason] = useState<number | null>(null);
-  const live = prefs.bg === 'live';
 
   const title = kind === 'movie' ? item!.title : show!.title;
   const year = kind === 'movie' ? item!.year : show!.year;
@@ -57,7 +55,7 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
   const file = target?.files?.[0];
   const prog = target?.progress;
   const resume = prog && !prog.watched && prog.position > 30 ? prog.position : 0;
-  const [sky, orb] = paletteFor(title);
+  const [sky] = paletteFor(title);
 
   useEffect(() => { setAmbient(ambientFor(title)); return () => setAmbient(null); }, [title]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -68,12 +66,6 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
     setAudio(def?.index);
   }, [file?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const mv = (k: number) => (live ? `translate3d(${(par.x * k).toFixed(1)}px,${(par.y * k).toFixed(1)}px,0)` : 'none');
-  const onHero = (e: React.MouseEvent<HTMLElement>) => {
-    if (!live) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    setPar({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: ((e.clientY - r.top) / r.height) * 2 - 1, sx: e.clientX - r.left, sy: e.clientY - r.top, hover: true });
-  };
 
   const playUrl = (f: number, it: number, start = resume) => `/play/${f}?item=${it}${start ? '&start=' + Math.floor(start) : ''}${audio !== undefined ? '&audio=' + audio : ''}${sub >= 0 ? '&sub=' + sub : ''}`;
   const toggleList = async (list: 'favorites' | 'later', on: boolean) => {
@@ -96,19 +88,18 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
   return (
     <main className="main" style={{ gap: 28 }}>
       <TopBar types={false} />
-      <section className="hero" onMouseMove={onHero} onMouseLeave={() => setPar((p) => ({ ...p, hover: false }))}
+      <section className="hero"
         style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: sky, minHeight: 'clamp(380px, 34vw, 540px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 40px 36px', color: '#FFFFFF', boxShadow: '0 20px 50px var(--sh)' }}>
         {backdrop ? (
           <Backdrop src={backdrop} />
         ) : (
           <>
-            <div aria-hidden="true" className="lay" style={{ position: 'absolute', inset: -40, transform: mv(-8) }}><div style={{ position: 'absolute', right: -60, top: -140, width: 720, height: 720, borderRadius: '50%', background: '#FFFFFF10' }} /></div>
-            <div aria-hidden="true" className="lay" style={{ position: 'absolute', inset: -40, transform: mv(-22) }}><div style={{ position: 'absolute', right: 200, top: 90, width: 280, height: 280, borderRadius: '50%', background: 'var(--acc)' }} /></div>
-            <div aria-hidden="true" className="lay" style={{ position: 'absolute', left: -40, right: -40, bottom: -30, height: 190, background: '#00000055', transform: mv(-36) }} />
+            <div aria-hidden="true" style={{ position: 'absolute', inset: -40 }}><div style={{ position: 'absolute', right: -60, top: -140, width: 720, height: 720, borderRadius: '50%', background: '#FFFFFF10' }} /></div>
+            <div aria-hidden="true" style={{ position: 'absolute', inset: -40 }}><div style={{ position: 'absolute', right: 200, top: 90, width: 280, height: 280, borderRadius: '50%', background: 'var(--acc)' }} /></div>
+            <div aria-hidden="true" style={{ position: 'absolute', left: -40, right: -40, bottom: -30, height: 190, background: '#00000055' }} />
           </>
         )}
         <HeroTrailer trailer={tmdbId ? { kind: kind === 'movie' ? 'movie' : 'tv', id: tmdbId } : null} />
-        <div aria-hidden="true" style={{ position: 'absolute', width: 440, height: 440, margin: '-220px 0 0 -220px', left: par.sx, top: par.sy, borderRadius: '50%', background: orb, filter: 'blur(70px)', opacity: live && par.hover ? 0.5 : 0, mixBlendMode: 'screen', transition: 'opacity .4s', pointerEvents: 'none' }} />
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,#000000B8 0%,#00000073 50%,transparent 80%)' }} />
         <nav aria-label={tr('Путь', 'Breadcrumb')} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, fontSize: 'calc(12px * var(--fs))', fontWeight: 600 }}>
           <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 999, background: '#FFFFFF2E', color: '#FFFFFF' }}><Icon name="left" size={14} />{t('home')}</Link>

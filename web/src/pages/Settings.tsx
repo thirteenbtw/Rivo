@@ -38,9 +38,8 @@ const checkSection: Record<string, string> = { ffmpeg: 'trans', tmdb: 'lib', por
 const index: [string, string, string, string][] = [
   ['look', 'Тема', 'Theme', 'светлая тёмная oled dark light'],
   ['look', 'Акцентный цвет', 'Accent color', 'цвет акцент'],
-  ['look', 'Задний фон', 'Background', 'точки фон живой'],
+  ['look', 'Задний фон', 'Background', 'точки фон'],
   ['look', 'Яркость фона', 'Background brightness', 'интенсивность'],
-  ['look', 'Цвет фона под постер', 'Tint background with poster', 'постер'],
   ['look', 'Меньше анимации', 'Reduce motion', 'анимация движение'],
   ['look', 'Трейлеры при наведении', 'Trailers on hover', 'трейлер youtube'],
   ['look', 'Размер текста', 'Text size', 'шрифт масштаб'],
@@ -171,7 +170,6 @@ function SettingsScreen() {
 
   return (
     <main className="main pad set-page">
-      <Blobs />
       <header className="set-top">
         <div>
           <h1 className="h1">{tr('Настройки', 'Settings')}</h1>
@@ -241,37 +239,5 @@ function SavedBadge() {
       {s === 'saved' && <Icon name="check" size={14} style={{ strokeWidth: 3 }} />}
       {s === 'saving' ? tr('Сохраняю…', 'Saving…') : s === 'error' ? tr('Не сохранилось', 'Not saved') : tr('Сохранено', 'Saved')}
     </span>
-  );
-}
-
-// Soft colored glow behind the glass cards, drifting after the cursor.
-function Blobs() {
-  const { prefs } = useApp();
-  const ref = useRef<HTMLDivElement>(null);
-  const still = prefs.calm || prefs.bg === 'off' || prefs.bg === 'static';
-  useEffect(() => {
-    if (still || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let raf = 0;
-    const move = (e: PointerEvent) => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const x = e.clientX / window.innerWidth - 0.5, y = e.clientY / window.innerHeight - 0.5;
-        ref.current?.querySelectorAll<HTMLElement>('span').forEach((b, i) => {
-          const k = [60, -45, 35][i];
-          b.style.transform = `translate(${x * k}px, ${y * k}px)`;
-        });
-      });
-    };
-    window.addEventListener('pointermove', move);
-    return () => { window.removeEventListener('pointermove', move); cancelAnimationFrame(raf); };
-  }, [still]);
-  if (prefs.bg === 'off') return null;
-  const k = prefs.intensity / 100;
-  return (
-    <div className="set-blobs" ref={ref} aria-hidden="true" style={{ opacity: Math.min(1, k) }}>
-      <span style={{ width: 420, height: 420, left: '18%', top: '8%', background: 'var(--acc)' }} />
-      <span style={{ width: 360, height: 360, right: '6%', top: '30%', background: 'var(--lav)' }} />
-      <span style={{ width: 320, height: 320, left: '42%', bottom: '-6%', background: 'var(--mint)' }} />
-    </div>
   );
 }

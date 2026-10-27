@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useApp } from '../state';
+import { useEffect, useState, type ReactNode } from 'react';
 import { tr } from '../i18n';
 import { Backdrop, ambientFor, paletteFor } from './Art';
 import { Icon } from './Icon';
@@ -13,14 +12,9 @@ export type Slide = { key: string; name: string; backdrop?: string; meta: string
 // short pause the slide's trailer starts muted behind the text; the carousel
 // waits for it and moves on when it ends.
 export function Featured({ slides, label }: { slides: Slide[]; label: string }) {
-  const { prefs } = useApp();
   const setAmbient = useAmbient();
   const [idx, setIdx] = useState(0);
   const [hover, setHover] = useState(false);
-  const [spot, setSpot] = useState({ x: 0, y: 0 });
-  const [par, setPar] = useState({ x: 0, y: 0 });
-  const raf = useRef(0);
-  const live = prefs.bg === 'live';
   const n = slides.length;
   const i = n ? idx % n : 0;
   const s = slides[i];
@@ -38,38 +32,25 @@ export function Featured({ slides, label }: { slides: Slide[]; label: string }) 
   useEffect(() => { if (s) setAmbient(ambientFor(s.name)); return () => setAmbient(null); }, [s?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!s) return null;
 
-  const onMove = (e: React.MouseEvent<HTMLElement>) => {
-    setHover(true);
-    if (!live) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - r.left, y = e.clientY - r.top;
-    cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(() => {
-      setSpot({ x, y });
-      setPar({ x: (x / r.width) * 2 - 1, y: (y / r.height) * 2 - 1 });
-    });
-  };
-  const mv = (k: number) => (live ? `translate3d(${(par.x * k).toFixed(1)}px,${(par.y * k).toFixed(1)}px,0)` : 'none');
   const [sky, orb] = paletteFor(s.name);
 
   return (
-    <section className="hero" aria-label={label} onMouseMove={onMove} onMouseLeave={() => setHover(false)}
+    <section className="hero" aria-label={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: sky, aspectRatio: '2.2 / 1', minHeight: 340, maxHeight: 'min(640px, calc(var(--vh) - 220px))', display: 'flex', alignItems: 'flex-end', transition: 'background .8s', boxShadow: '0 20px 50px var(--sh)', flex: 'none' }}>
       {s.backdrop ? (
         <Backdrop src={s.backdrop} />
       ) : (
         <>
-          <div aria-hidden="true" className="lay" style={{ position: 'absolute', inset: -40, transform: mv(-8) }}>
+          <div aria-hidden="true" style={{ position: 'absolute', inset: -40 }}>
             <div style={{ position: 'absolute', right: -60, top: -140, width: 680, height: 680, borderRadius: '50%', background: '#FFFFFF10' }} />
           </div>
-          <div aria-hidden="true" className="lay" style={{ position: 'absolute', inset: -40, transform: mv(-22) }}>
+          <div aria-hidden="true" style={{ position: 'absolute', inset: -40 }}>
             <div style={{ position: 'absolute', right: 220, top: 90, width: 280, height: 280, borderRadius: '50%', background: orb, transition: 'background .8s' }} />
           </div>
         </>
       )}
       {ytKey && <YouTubeCover key={s.key} ytKey={ytKey} muted={muted} onPlaying={() => setPlaying(true)}
         onEnd={() => { setPlaying(false); setStopped(s.key); if (n > 1) setIdx((x) => (x + 1) % n); }} />}
-      <div aria-hidden="true" style={{ position: 'absolute', width: 440, height: 440, margin: '-220px 0 0 -220px', left: spot.x, top: spot.y, borderRadius: '50%', background: orb, filter: 'blur(70px)', opacity: live && hover ? 0.45 : 0, mixBlendMode: 'screen', transition: 'opacity .4s', pointerEvents: 'none' }} />
       <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #000000B8 0%, #00000073 45%, transparent 75%), linear-gradient(0deg, #00000080 0%, transparent 45%)' }} />
 
       {playing && (
