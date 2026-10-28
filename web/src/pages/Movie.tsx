@@ -18,7 +18,7 @@ export function MoviePage() {
   const { id } = useParams();
   const { data, error, reload } = useAsync(() => api.get<ItemResp>(`/api/items/${id}`), [id]);
   if (error) return <main className="main pad"><div className="err">{error}</div></main>;
-  if (!data) return <main className="main pad"><span className="spin" /></main>;
+  if (!data) return <main className="main pad"><div className="loading"><span className="spin lg" /></div></main>;
   return <Detail kind="movie" item={data.item} similar={data.similar} compat={data.compat} reload={reload} />;
 }
 
@@ -26,7 +26,7 @@ export function ShowPage() {
   const { id } = useParams();
   const { data, error, reload } = useAsync(() => api.get<ShowResp>(`/api/shows/${id}`), [id]);
   if (error) return <main className="main pad"><div className="err">{error}</div></main>;
-  if (!data) return <main className="main pad"><span className="spin" /></main>;
+  if (!data) return <main className="main pad"><div className="loading"><span className="spin lg" /></div></main>;
   return <Detail kind="show" show={data.show} nextUp={data.nextUp} reload={reload} />;
 }
 

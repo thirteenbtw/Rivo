@@ -129,7 +129,7 @@ function Remote({ s }: { s: CastStatus }) {
     <aside aria-label={tr('Пульт', 'Remote')} style={{ flex: '1 1 380px', minWidth: 0, borderRadius: 24, background: 'var(--bg2)', border: '1px solid var(--line)', color: 'var(--fg)', padding: 20, display: 'flex', flexDirection: 'column', gap: 18, alignSelf: 'flex-start' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'calc(12px * var(--fs))', color: 'var(--mut2)' }}>
         <Icon name="cast" size={16} />{tr('Идёт на', 'Playing on')} «{s.deviceName}»
-        {s.state === 'buffering' && <span className="spin" style={{ width: 14, height: 14 }} />}
+        {s.state === 'buffering' && <span className="spin" style={{ ['--s' as string]: '14px' }} />}
       </div>
       {s.error && <div style={{ fontSize: 'calc(12px * var(--fs))', color: 'var(--err-fg)' }}>{s.error}</div>}
       <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>

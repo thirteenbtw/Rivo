@@ -30,7 +30,7 @@ export default function CatalogTitlePage() {
       </main>
     );
   }
-  if (!data) return <main className="main pad"><span className="spin" /></main>;
+  if (!data) return <main className="main pad"><div className="loading"><span className="spin lg" /></div></main>;
   return <Detail key={kind + id} d={data} />;
 }
 

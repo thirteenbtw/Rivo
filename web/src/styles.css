@@ -125,9 +125,13 @@ html{background:var(--bg,#fff);--sb:color-mix(in srgb,var(--fg,#111214) 22%,tran
 .modal-back{position:fixed;inset:0;background:#000000A0;display:grid;place-items:center;z-index:50;padding:16px}
 .modal{width:min(560px,100%);max-height:calc(var(--vh) - 32px);overflow:auto;background:var(--bg);color:var(--fg);border-radius:20px;border:1px solid var(--line);box-shadow:0 30px 80px #00000066;padding:22px;display:flex;flex-direction:column;gap:14px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:calc(13px * var(--fs));font-weight:600;z-index:60;box-shadow:0 10px 30px #0004;max-width:calc(100vw - 32px)}
-.spin{width:18px;height:18px;border-radius:50%;border:3.5px solid var(--acc-lt,#A5B4FC);position:relative;animation:sp 1.2s cubic-bezier(.6,0,.4,1) infinite;display:inline-block;flex:none}
-/* the spark orbits the ring, as on the Rivo loading mark */
-.spin::after{content:"";position:absolute;right:-5px;top:-5px;width:5px;height:5px;border-radius:1px;background:var(--mint,#8EDCC8);transform:rotate(45deg)}
+/* the Rivo loading mark: a thick ring with the spark orbiting it, in the reference's proportions
+   (ring r16 + stroke 9 in a 64 box, spark 12 at +20/-24 from the ring centre); --s is the ring's outer size */
+.spin{--s:18px;width:var(--s);height:var(--s);border-radius:50%;border:calc(var(--s) * .22) solid var(--acc-lt,#A5B4FC);position:relative;animation:sp 2.4s cubic-bezier(.6,0,.4,1) infinite;display:inline-block;flex:none}
+.spin::after{content:"";position:absolute;left:calc(var(--s) * .62);top:calc(var(--s) * -.45);width:calc(var(--s) * .29);height:calc(var(--s) * .29);border-radius:calc(var(--s) * .05);background:var(--mint,#8EDCC8);transform:rotate(45deg)}
+/* page-level loader, the size of the mark on the reference card */
+.spin.lg{--s:46px}
+.loading{display:flex;align-items:center;justify-content:center;min-height:240px}
 @keyframes sp{to{transform:rotate(360deg)}}
 
 /* player */

@@ -61,7 +61,7 @@ export default function PersonPage() {
     <main className="main">
       <TopBar catalog />
       {error && <div className="empty">{error}</div>}
-      {!data && !error && <span className="spin" />}
+      {!data && !error && <div className="loading"><span className="spin lg" /></div>}
       {data && <Detail key={data.id} p={data} />}
     </main>
   );
@@ -237,7 +237,7 @@ export function PersonFind() {
   return (
     <main className="main">
       <TopBar catalog />
-      {miss ? <div className="empty">{tr(`Не нашли «${name}» в TMDB`, `“${name}” was not found on TMDB`)}</div> : <span className="spin" />}
+      {miss ? <div className="empty">{tr(`Не нашли «${name}» в TMDB`, `“${name}” was not found on TMDB`)}</div> : <div className="loading"><span className="spin lg" /></div>}
     </main>
   );
 }
@@ -279,7 +279,7 @@ export function PeoplePage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 16 }}>
           {items.map((x) => <Face key={x.id} x={x} />)}
         </div>
-        {loading && <span className="spin" />}
+        {loading && <div className="loading" style={{ minHeight: items.length ? 120 : undefined }}><span className="spin lg" /></div>}
         {!loading && page < pages && items.length > 0 && <button className="btn btn-l sm" style={{ alignSelf: 'center' }} onClick={() => load(page + 1)}>{tr('Показать ещё', 'Show more')}</button>}
       </Section>
     </main>
