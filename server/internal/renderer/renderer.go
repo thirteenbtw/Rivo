@@ -269,6 +269,7 @@ func (m *Manager) Load(ctx context.Context, id string, req LoadRequest) error {
 		if lastErr = r.Load(ctx, req); lastErr == nil {
 			break
 		}
+		log.Printf("cast %s (%s): load attempt %d: %v", d.Name, d.Addr, attempt+1, lastErr)
 		r.Close()
 		r = newCast(d)
 		time.Sleep(time.Duration(attempt+1) * time.Second)
@@ -276,6 +277,7 @@ func (m *Manager) Load(ctx context.Context, id string, req LoadRequest) error {
 	if lastErr != nil {
 		return lastErr
 	}
+	log.Printf("cast %s (%s): playing %q, %s", d.Name, d.Addr, req.Title, req.Transcode)
 	m.mu.Lock()
 	m.active[id] = r
 	m.sessions[id] = &req
@@ -377,6 +379,9 @@ func (m *Manager) pollActive(saveProgress bool) {
 			// TV went away (Wi-Fi drop): keep the session, reconnect in the
 			// background so the other TVs and the API do not wait for it.
 			m.mu.Lock()
+			if _, had := m.status[id]; had {
+				log.Printf("cast %s: lost the TV: %v", r.Device().Name, err)
+			}
 			m.lastErr[id] = err.Error()
 			delete(m.status, id)
 			m.mu.Unlock()
@@ -397,6 +402,10 @@ func (m *Manager) pollActive(saveProgress bool) {
 		}
 		m.mu.Lock()
 		if m.active[id] == r {
+			// buffering mid-movie is the TV not getting data fast enough
+			if prev := m.status[id]; st.State == "buffering" && prev.State == "playing" {
+				log.Printf("cast %s: buffering at %.0fs", r.Device().Name, st.Position)
+			}
 			m.status[id] = st
 		}
 		m.mu.Unlock()
@@ -456,7 +465,9 @@ func CastCaps(model string) Caps {
 	case strings.Contains(md, "google tv") || strings.Contains(md, "android") || strings.Contains(md, "shield") || strings.Contains(md, "bravia") || strings.Contains(md, "tv"):
 		c.Video = append(c.Video, "hevc", "vp9", "av1")
 		c.Audio = append(c.Audio, "ac3", "eac3")
-		c.Container = append(c.Container, "mkv")
+		// no mkv: the Cast receiver reads Matroska as one long download
+		// with no index to seek in and stalls on big files; remuxing to HLS
+		// copies the video and costs next to no CPU
 		c.MaxHeight, c.HDR = 2160, true
 	case strings.Contains(md, "ultra"):
 		c.Video = append(c.Video, "hevc", "vp9")
