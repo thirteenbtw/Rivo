@@ -121,10 +121,15 @@ type Manager struct {
 	sessions map[string]*LoadRequest
 	loadedAt map[string]time.Time
 	lastErr  map[string]string
+	// status is the last answer from each TV, refreshed by the poll loop.
+	// Readers use it instead of asking the TV, so a slow or lost TV never
+	// holds mu while the API waits on it.
+	status       map[string]Status
+	reconnecting map[string]bool
 }
 
 func NewManager(s *store.Store, bus *events.Bus) *Manager {
-	return &Manager{Store: s, Bus: bus, seen: map[string]time.Time{}, active: map[string]Renderer{}, sessions: map[string]*LoadRequest{}, loadedAt: map[string]time.Time{}, lastErr: map[string]string{}}
+	return &Manager{Store: s, Bus: bus, seen: map[string]time.Time{}, active: map[string]Renderer{}, sessions: map[string]*LoadRequest{}, loadedAt: map[string]time.Time{}, lastErr: map[string]string{}, status: map[string]Status{}, reconnecting: map[string]bool{}}
 }
 
 func (m *Manager) Run(ctx context.Context) {
@@ -276,6 +281,7 @@ func (m *Manager) Load(ctx context.Context, id string, req LoadRequest) error {
 	m.sessions[id] = &req
 	m.loadedAt[id] = time.Now()
 	delete(m.lastErr, id)
+	m.status[id] = Status{DeviceID: id, DeviceName: d.Name, State: "buffering"}
 	m.mu.Unlock()
 	return nil
 }
@@ -313,13 +319,13 @@ func (m *Manager) Volume(id string, v float64) error {
 // with the same item at the current position).
 func (m *Manager) Session(id string) (*LoadRequest, Status) {
 	m.mu.Lock()
-	r, ok := m.active[id]
+	_, ok := m.active[id]
 	req := m.sessions[id]
+	st := m.status[id]
 	m.mu.Unlock()
 	if !ok {
 		return nil, Status{}
 	}
-	st, _ := r.Status()
 	return req, st
 }
 
@@ -327,13 +333,17 @@ func (m *Manager) Stop(id string) {
 	m.mu.Lock()
 	r, ok := m.active[id]
 	req := m.sessions[id]
+	st, known := m.status[id]
 	delete(m.active, id)
 	delete(m.sessions, id)
+	delete(m.status, id)
 	m.mu.Unlock()
 	if !ok {
 		return
 	}
-	if st, err := r.Status(); err == nil && req != nil && m.OnProgress != nil && st.Position > 0 && req.ItemID > 0 {
+	// the last polled position is at most a second old; asking a TV that
+	// stopped answering would keep the stop button waiting
+	if known && req != nil && m.OnProgress != nil && st.Position > 0 && req.ItemID > 0 {
 		m.OnProgress(req.ProfileID, req.ItemID, st.Position+req.Offset, req.Duration)
 	}
 	_ = r.Stop()
@@ -356,17 +366,40 @@ func (m *Manager) pollActive(saveProgress bool) {
 		if r == nil {
 			continue
 		}
+		m.mu.Lock()
+		busy := m.reconnecting[id]
+		m.mu.Unlock()
+		if busy {
+			continue
+		}
 		st, err := r.Status()
 		if err != nil {
-			// TV went away (Wi-Fi drop): keep the session, try to reconnect quietly.
+			// TV went away (Wi-Fi drop): keep the session, reconnect in the
+			// background so the other TVs and the API do not wait for it.
 			m.mu.Lock()
 			m.lastErr[id] = err.Error()
+			delete(m.status, id)
 			m.mu.Unlock()
 			if c, ok := r.(*castRenderer); ok {
-				_ = c.reconnect()
+				m.mu.Lock()
+				m.reconnecting[id] = true
+				m.mu.Unlock()
+				go func() {
+					if err := c.reconnect(); err != nil {
+						log.Printf("cast %s: reconnect: %v", c.dev.Name, err)
+					}
+					m.mu.Lock()
+					delete(m.reconnecting, id)
+					m.mu.Unlock()
+				}()
 			}
 			continue
 		}
+		m.mu.Lock()
+		if m.active[id] == r {
+			m.status[id] = st
+		}
+		m.mu.Unlock()
 		if req != nil && req.ItemID > 0 && saveProgress && m.OnProgress != nil && st.Position > 0 && (st.State == "playing" || st.State == "paused") {
 			m.OnProgress(req.ProfileID, req.ItemID, st.Position+req.Offset, req.Duration)
 		}
@@ -376,8 +409,11 @@ func (m *Manager) pollActive(saveProgress bool) {
 		if st.State == "idle" && settled {
 			// Finished, or stopped with the TV's own remote.
 			m.mu.Lock()
-			delete(m.active, id)
-			delete(m.sessions, id)
+			if m.active[id] == r {
+				delete(m.active, id)
+				delete(m.sessions, id)
+				delete(m.status, id)
+			}
 			m.mu.Unlock()
 			r.Close()
 		}
@@ -390,9 +426,9 @@ func (m *Manager) Statuses() []Status {
 	defer m.mu.Unlock()
 	out := []Status{}
 	for id, r := range m.active {
-		st, err := r.Status()
+		st, ok := m.status[id]
 		req := m.sessions[id]
-		if err != nil {
+		if !ok {
 			st = Status{DeviceID: id, State: "connecting", Error: m.lastErr[id]}
 		}
 		if req != nil {
