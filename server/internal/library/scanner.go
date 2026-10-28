@@ -78,7 +78,11 @@ func (sc *Scanner) Run(ctx context.Context) {
 		log.Printf("watcher: %v", err)
 	}
 	go sc.metaLoop(ctx)
-	sc.RequestScan(0)
+	if sc.Store.Setting("scanOnStart", "1") != "0" {
+		sc.RequestScan(0)
+	} else {
+		go sc.watchFolders()
+	}
 	// Periodic full rescan catches changes the watcher missed (network drives).
 	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
@@ -123,6 +127,32 @@ func (sc *Scanner) scan(ctx context.Context, only int64) {
 	sc.KickMetadata()
 }
 
+// skipDir reports folders the scan never looks into.
+func skipDir(root, p, name string) bool {
+	return p != root && (strings.HasPrefix(name, ".") || strings.EqualFold(name, "$RECYCLE.BIN") || strings.EqualFold(name, "System Volume Information") || name == ".incomplete")
+}
+
+// watchFolders registers library folders with the watcher without a scan,
+// for when the startup scan is turned off.
+func (sc *Scanner) watchFolders() {
+	libs, err := sc.Store.Libraries()
+	if err != nil || sc.watcher == nil {
+		return
+	}
+	for _, lib := range libs {
+		_ = filepath.WalkDir(lib.Path, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || !d.IsDir() {
+				return nil
+			}
+			if skipDir(lib.Path, p, d.Name()) {
+				return filepath.SkipDir
+			}
+			_ = sc.watcher.Add(p)
+			return nil
+		})
+	}
+}
+
 func (sc *Scanner) scanLibrary(ctx context.Context, lib store.Library) {
 	known, err := sc.Store.AllFilePaths(lib.ID)
 	if err != nil {
@@ -134,8 +164,7 @@ func (sc *Scanner) scanLibrary(ctx context.Context, lib store.Library) {
 			return nil // unreadable folder: skip, keep scanning
 		}
 		if d.IsDir() {
-			name := d.Name()
-			if p != lib.Path && (strings.HasPrefix(name, ".") || strings.EqualFold(name, "$RECYCLE.BIN") || strings.EqualFold(name, "System Volume Information") || name == ".incomplete") {
+			if skipDir(lib.Path, p, d.Name()) {
 				return filepath.SkipDir
 			}
 			if sc.watcher != nil {
@@ -263,6 +292,9 @@ func (sc *Scanner) watchLoop(ctx context.Context) {
 				if st, err := os.Stat(ev.Name); err == nil && st.IsDir() {
 					_ = sc.watcher.Add(ev.Name)
 				}
+			}
+			if sc.Store.Setting("watchFS", "1") == "0" {
+				continue // "watch for changes" is off: the periodic rescan still runs
 			}
 			if id := sc.libraryFor(ev.Name); id != 0 {
 				pending[id] = true

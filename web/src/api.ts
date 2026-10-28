@@ -25,10 +25,10 @@ export type Show = {
   seasons?: { number: number; episodes: Item[] }[];
 };
 export type Profile = { id: number; name: string; hasPin: boolean; color: string; prefs: Prefs; isKid: boolean };
-export type Prefs = { theme?: 'light' | 'dark' | 'oled'; accent?: 'iris' | 'mint' | 'red' | 'amber' | 'blue' | 'green'; bg?: 'live' | 'static' | 'off'; intensity?: number; posterTint?: boolean; trailers?: boolean };
+export type Prefs = { theme?: 'light' | 'dark' | 'oled'; accent?: 'iris' | 'mint' | 'red' | 'amber' | 'blue' | 'green'; bg?: 'static' | 'off'; intensity?: number; posterTint?: boolean; trailers?: boolean; calm?: boolean };
 export type ScanStatus = { scanning: boolean; library: string; done: number; total: number; added: number; movies: number; shows: number; matching: number; error?: string };
 export type AppState = {
-  version: string; setupDone: boolean; authRequired: boolean; lanUrls: string[]; uiLang: string; local: boolean;
+  version: string; setupDone: boolean; authRequired: boolean; lanUrls: string[]; uiLang: string; local: boolean; askProfile?: boolean;
   profiles?: Profile[]; profileId?: number;
 };
 export type PlayTrack = { index: number; label: string; name?: string; meta?: string; codec: string; lang: string; selected: boolean; url?: string; bitmap?: boolean; external?: boolean };
@@ -85,10 +85,11 @@ export type CastStatus = {
   fileId: number; torrent?: string; file: number; encoder?: string; audio: number; sub: number;
 };
 export type Check = { id: string; name: string; ok: boolean; warn: boolean; detail: string };
-export type Library = { id: number; path: string; kind: string; online: boolean };
+export type Library = { id: number; path: string; kind: string; online: boolean; files?: number };
 export type Settings = {
   metaLang: string; uiLang: string; hwaccel: string; quality: string; maxStreams: string; tonemap: string; externalPlayer: string;
   useExternal: string; setupDone: string; subLang: string; autoNext: string; tmdbKeySet: boolean; tmdbKeyTail?: string; tmdbApi: string; tmdbImg: string; tmdbVia: 'cub' | 'direct' | 'custom'; passwordSet: boolean;
+  audioLang: string; watchedAt: string; playerKind: string; watchFS: string; scanOnStart: string; askProfile: string; autoBackup: string;
   hw: { ffmpegFound: boolean; version: string; encoders: string[] | null; zscale: boolean }; encoder: string;
 };
 

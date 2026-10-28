@@ -99,6 +99,7 @@ func main() {
 	go scanner.Run(ctx)
 	torrents.Start(ctx)
 	go cast.Run(ctx)
+	go srv.RunBackups(ctx)
 
 	// The desktop shell waits for this line to know the port.
 	fmt.Printf("HOMECINEMA_READY http://127.0.0.1:%d\n", port)

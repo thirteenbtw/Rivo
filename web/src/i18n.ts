@@ -2,7 +2,7 @@
 const ru = {
   home: 'Главная', movies: 'Фильмы', shows: 'Сериалы', torrents: 'Торренты', devices: 'Устройства', favorites: 'Избранное', later: 'Посмотреть позже',
   catalog: 'Каталог', settings: 'Настройки', profile: 'Профиль', theme: 'Тема', back: 'Назад', forward: 'Вперёд',
-  searchPh: 'Фильмы, сериалы и люди', all: 'Все', people: 'Люди', liveBg: 'Живой фон', bgOff: 'Фон выкл.',
+  searchPh: 'Фильмы, сериалы и люди', all: 'Все', people: 'Люди', liveBg: 'Фон', bgOff: 'Фон выкл.',
   watch: 'Смотреть', continue: 'Продолжить', toTv: 'На ТВ', details: 'Подробнее', inList: 'В список', inListOn: 'В списке',
   addFav: 'В избранное', markWatched: 'Отметить просмотренным', watched: 'Просмотрено',
   continueWatching: 'Продолжить просмотр', syncNote: 'Позиция синхронизируется между ПК и ТВ', popular: 'Популярное в библиотеке',
@@ -26,7 +26,7 @@ export type Key = keyof typeof ru;
 const en: Partial<Record<Key, string>> = {
   home: 'Home', movies: 'Movies', shows: 'Shows', torrents: 'Torrents', devices: 'Devices', favorites: 'Favorites', later: 'Watch later',
   catalog: 'Catalog', settings: 'Settings', profile: 'Profile', theme: 'Theme', back: 'Back', forward: 'Forward',
-  searchPh: 'Movies, shows and people', all: 'All', people: 'People', liveBg: 'Live background', bgOff: 'Background off',
+  searchPh: 'Movies, shows and people', all: 'All', people: 'People', liveBg: 'Background', bgOff: 'Background off',
   watch: 'Watch', continue: 'Continue', toTv: 'To TV', details: 'Details', inList: 'Add to list', inListOn: 'In list',
   addFav: 'Add to favorites', markWatched: 'Mark as watched', watched: 'Watched',
   continueWatching: 'Continue watching', syncNote: 'Position syncs between PC and TV', popular: 'Popular in the library',

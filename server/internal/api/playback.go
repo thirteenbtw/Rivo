@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -250,6 +251,50 @@ func (s *Server) playInfo(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, pb)
 }
 
+// defaultAudio picks the first regular track in the "audioLang" language,
+// or -1 to keep the file's own first track.
+func (s *Server) defaultAudio(tracks []store.Track) int {
+	want := langName(s.Store.Setting("audioLang", ""))
+	if want == "" {
+		return -1
+	}
+	for _, a := range tracks {
+		if !a.Comment && !a.Described && trackLang(a) == want {
+			return a.Index
+		}
+	}
+	return -1
+}
+
+// defaultSub turns on text subtitles in the "subLang" language when the
+// sound is in another language; with matching sound only forced ones.
+func (s *Server) defaultSub(f *store.File, audioIdx int) int {
+	want := langName(s.Store.Setting("subLang", "rus"))
+	if want == "" || len(f.Subs) == 0 {
+		return -1
+	}
+	same := false
+	for i, a := range f.Audio {
+		if a.Index == audioIdx || audioIdx < 0 && i == 0 {
+			same = trackLang(a) == want
+		}
+	}
+	best, score := -1, 0
+	for i, t := range f.Subs {
+		if transcode.IsBitmapSub(t.Codec) || trackLang(t) != want || same && !t.Forced {
+			continue
+		}
+		sc := 1
+		if !t.Forced && !t.SDH {
+			sc = 2
+		}
+		if sc > score {
+			best, score = i, sc
+		}
+	}
+	return best
+}
+
 func fileInfoLine(year int, f *store.File, mode string) string {
 	var parts []string
 	if year > 0 {
@@ -289,6 +334,13 @@ func (s *Server) preparePlayback(ctx context.Context, f *store.File, input strin
 		subIdx = v
 	}
 	burn := get("burn") == "1"
+	if audioIdx < 0 {
+		audioIdx = s.defaultAudio(f.Audio)
+	}
+	// Only the PC player asks for default subtitles: TVs burn in what is selected.
+	if get("autosub") == "1" && subIdx < 0 {
+		subIdx = s.defaultSub(f, audioIdx)
+	}
 
 	pb := &playback{FileID: f.ID, Duration: f.Duration, Audio: []trackOut{}, Subs: []trackOut{}}
 	var audio *store.Track
@@ -501,7 +553,7 @@ func (s *Server) openExternal(w http.ResponseWriter, r *http.Request) error {
 	}
 	player := s.Store.Setting("externalPlayer", "")
 	if player == "" {
-		player = findPlayer()
+		player = findPlayer(s.Store.Setting("playerKind", ""))
 	}
 	if player == "" {
 		return badRequest("VLC или mpv не найдены — укажите путь в настройках")
@@ -522,12 +574,15 @@ func (s *Server) openExternal(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, map[string]bool{"ok": true})
 }
 
-func findPlayer() string {
+func findPlayer(kind string) string {
 	cands := []string{"vlc", "mpv"}
 	for _, pf := range []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)")} {
 		if pf != "" {
 			cands = append([]string{filepath.Join(pf, "VideoLAN", "VLC", "vlc.exe"), filepath.Join(pf, "mpv", "mpv.exe")}, cands...)
 		}
+	}
+	if kind == "mpv" { // the chosen player goes first
+		sort.SliceStable(cands, func(i, j int) bool { return strings.Contains(cands[i], "mpv") && !strings.Contains(cands[j], "mpv") })
 	}
 	for _, c := range cands {
 		if p, err := exec.LookPath(c); err == nil {

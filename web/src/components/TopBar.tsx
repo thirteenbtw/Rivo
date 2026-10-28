@@ -87,7 +87,7 @@ export function TopBar({ types = true, catalog = false }: { types?: boolean; cat
         )}
       </div>
       <div className="tb-side" style={{ flex: '1 1 120px', display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
-        <button className="pill" onClick={() => setPrefs({ bg: bgOn ? 'off' : 'live' })} aria-pressed={bgOn} style={{ height: 40 }}>
+        <button className="pill" onClick={() => setPrefs({ bg: bgOn ? 'off' : 'static' })} aria-pressed={bgOn} style={{ height: 40 }}>
           <Icon name="sparkle" size={16} style={{ color: 'var(--acct)' }} />{bgOn ? t('liveBg') : t('bgOff')}
         </button>
         <Link className="pill" to="/devices" style={{ height: 40 }}>

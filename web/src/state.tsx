@@ -25,7 +25,7 @@ type Ctx = {
 const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
 
-const defaults: Required<Prefs> = { theme: 'light', accent: 'iris', bg: 'live', intensity: 100, posterTint: true, trailers: true };
+const defaults: Required<Prefs> = { theme: 'light', accent: 'iris', bg: 'static', intensity: 100, posterTint: true, trailers: true, calm: false };
 
 function loadLocalPrefs(): Prefs {
   try { return JSON.parse(localStorage.getItem('hc.prefs') || '{}'); } catch { return {}; }
@@ -79,7 +79,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state?.authRequired, state?.profileId]);
 
   const profile = useMemo(() => state?.profiles?.find((p) => p.id === state.profileId) ?? null, [state]);
-  const prefs = useMemo<Required<Prefs>>(() => ({ ...defaults, ...(profile?.prefs || {}), ...localPrefs }), [profile, localPrefs]);
+  const prefs = useMemo<Required<Prefs>>(() => {
+    const p = { ...defaults, ...(profile?.prefs || {}), ...localPrefs };
+    if (p.bg !== 'off') p.bg = 'static'; // the live background is gone; older prefs may still say "live"
+    return p;
+  }, [profile, localPrefs]);
 
   const setPrefs = useCallback((p: Prefs) => {
     setLocalPrefs((cur) => {

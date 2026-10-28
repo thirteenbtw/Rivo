@@ -55,26 +55,16 @@ export default function ProfilesPage() {
   );
 }
 
-// Profile list with create/edit, used on the settings page.
+export type ProfileDraft = Partial<Profile> & { pin?: string; clearPin?: boolean };
+export const newProfile = (count: number): ProfileDraft => ({ name: '', color: colors[count % colors.length] });
+export const MAX_PROFILES = MAX;
+export { Avatar };
+
+// Profile list with create/edit (the "Manage profiles" dialog).
 export function ProfilesEditor() {
-  const { state, reload, toast } = useApp();
-  const [edit, setEdit] = useState<Partial<Profile> & { pin?: string; clearPin?: boolean } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const { state } = useApp();
+  const [edit, setEdit] = useState<ProfileDraft | null>(null);
   const list = state?.profiles || [];
-  const save = async () => {
-    if (!edit) return;
-    setErr(null);
-    const body: Record<string, unknown> = { name: edit.name, color: edit.color, isKid: !!edit.isKid };
-    if (edit.pin) body.pin = edit.pin; else if (edit.clearPin) body.pin = '';
-    try {
-      if (edit.id) await api.patch(`/api/profiles/${edit.id}`, body); else await api.post('/api/profiles', body);
-      setEdit(null); await reload();
-    } catch (e: any) { setErr(e.message); }
-  };
-  const remove = async () => {
-    if (!edit?.id) return;
-    try { await api.del(`/api/profiles/${edit.id}`); setEdit(null); await reload(); toast(tr('Профиль удалён', 'Profile removed')); } catch (e: any) { setErr(e.message); }
-  };
   return (
     <>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
@@ -86,33 +76,55 @@ export function ProfilesEditor() {
           </button>
         ))}
         {list.length < MAX && (
-          <button onClick={() => setEdit({ name: '', color: colors[list.length % colors.length] })} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--fg)', minWidth: 72 }}>
+          <button onClick={() => setEdit(newProfile(list.length))} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 0, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--fg)', minWidth: 72 }}>
             <span style={{ width: 56, height: 56, borderRadius: '50%', background: '#8E9196', color: '#FFFFFF', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 'calc(20px * var(--fs))' }}>+</span>
             <span style={{ fontSize: 'calc(12px * var(--fs))', fontWeight: 600 }}>{tr('Добавить', 'Add')}</span>
             <span style={{ fontSize: 'calc(11px * var(--fs))', color: 'var(--mut)' }}>{list.length}/{MAX}</span>
           </button>
         )}
       </div>
-      {edit && (
-        <Modal title={edit.id ? tr('Профиль', 'Profile') : tr('Новый профиль', 'New profile')} onClose={() => { setEdit(null); setErr(null); }}>
-          <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={(e) => { e.preventDefault(); save(); }}>
-            <label className="fld">{tr('Имя', 'Name')}<input className="inp" autoFocus value={edit.name || ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} maxLength={24} /></label>
-            <div role="radiogroup" aria-label={tr('Цвет', 'Color')} style={{ display: 'flex', gap: 8 }}>
-              {colors.map((c) => <button type="button" key={c} role="radio" aria-checked={edit.color === c} aria-label={c} onClick={() => setEdit({ ...edit, color: c })} style={{ width: 36, height: 36, borderRadius: '50%', border: 0, background: c, cursor: 'pointer', boxShadow: edit.color === c ? '0 0 0 2px var(--bg), 0 0 0 4px ' + c : 'none' }} />)}
-            </div>
-            <label className="fld">PIN {edit.hasPin && <span>· {tr('задан; оставьте пустым, чтобы не менять', 'set; leave empty to keep')}</span>}
-              <input className="inp mono" type="password" inputMode="numeric" maxLength={8} value={edit.pin || ''} onChange={(e) => setEdit({ ...edit, pin: e.target.value.replace(/\D/g, '') })} placeholder={tr('4–8 цифр, необязательно', '4–8 digits, optional')} />
-            </label>
-            {edit.hasPin && <label className="chk"><input type="checkbox" checked={!!edit.clearPin} onChange={(e) => setEdit({ ...edit, clearPin: e.target.checked })} />{tr('Убрать PIN', 'Remove PIN')}</label>}
-            <label className="chk"><input type="checkbox" checked={!!edit.isKid} onChange={(e) => setEdit({ ...edit, isKid: e.target.checked })} />{tr('Детский профиль', 'Kids profile')}</label>
-            {err && <div className="err">{err}</div>}
-            <div className="row">
-              <button className="btn btn-d sm" disabled={!edit.name?.trim() || (!!edit.pin && edit.pin.length < 4)}>{tr('Сохранить', 'Save')}</button>
-              {edit.id && list.length > 1 && <button type="button" className="btn btn-o sm" onClick={remove}>{tr('Удалить профиль', 'Delete profile')}</button>}
-            </div>
-          </form>
-        </Modal>
-      )}
+      {edit && <ProfileDialog initial={edit} onClose={() => setEdit(null)} />}
     </>
+  );
+}
+
+// ProfileDialog creates or edits one profile.
+export function ProfileDialog({ initial, onClose }: { initial: ProfileDraft; onClose: () => void }) {
+  const { state, reload, toast } = useApp();
+  const [edit, setEdit] = useState<ProfileDraft>(initial);
+  const [err, setErr] = useState<string | null>(null);
+  const list = state?.profiles || [];
+  const save = async () => {
+    setErr(null);
+    const body: Record<string, unknown> = { name: edit.name, color: edit.color, isKid: !!edit.isKid };
+    if (edit.pin) body.pin = edit.pin; else if (edit.clearPin) body.pin = '';
+    try {
+      if (edit.id) await api.patch(`/api/profiles/${edit.id}`, body); else await api.post('/api/profiles', body);
+      onClose(); await reload();
+    } catch (e: any) { setErr(e.message); }
+  };
+  const remove = async () => {
+    if (!edit.id) return;
+    try { await api.del(`/api/profiles/${edit.id}`); onClose(); await reload(); toast(tr('Профиль удалён', 'Profile removed')); } catch (e: any) { setErr(e.message); }
+  };
+  return (
+    <Modal title={edit.id ? tr('Профиль', 'Profile') : tr('Новый профиль', 'New profile')} onClose={onClose}>
+      <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <label className="fld">{tr('Имя', 'Name')}<input className="inp" autoFocus value={edit.name || ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} maxLength={24} /></label>
+        <div role="radiogroup" aria-label={tr('Цвет', 'Color')} style={{ display: 'flex', gap: 8 }}>
+          {colors.map((c) => <button type="button" key={c} role="radio" aria-checked={edit.color === c} aria-label={c} onClick={() => setEdit({ ...edit, color: c })} style={{ width: 36, height: 36, borderRadius: '50%', border: 0, background: c, cursor: 'pointer', boxShadow: edit.color === c ? '0 0 0 2px var(--bg), 0 0 0 4px ' + c : 'none' }} />)}
+        </div>
+        <label className="fld">PIN {edit.hasPin && <span>· {tr('задан; оставьте пустым, чтобы не менять', 'set; leave empty to keep')}</span>}
+          <input className="inp mono" type="password" inputMode="numeric" maxLength={8} value={edit.pin || ''} onChange={(e) => setEdit({ ...edit, pin: e.target.value.replace(/\D/g, '') })} placeholder={tr('4–8 цифр, необязательно', '4–8 digits, optional')} />
+        </label>
+        {edit.hasPin && <label className="chk"><input type="checkbox" checked={!!edit.clearPin} onChange={(e) => setEdit({ ...edit, clearPin: e.target.checked })} />{tr('Убрать PIN', 'Remove PIN')}</label>}
+        <label className="chk"><input type="checkbox" checked={!!edit.isKid} onChange={(e) => setEdit({ ...edit, isKid: e.target.checked })} />{tr('Детский профиль', 'Kids profile')}</label>
+        {err && <div className="err">{err}</div>}
+        <div className="row">
+          <button className="btn btn-d sm" disabled={!edit.name?.trim() || (!!edit.pin && edit.pin.length < 4)}>{tr('Сохранить', 'Save')}</button>
+          {edit.id && list.length > 1 && <button type="button" className="btn btn-o sm" onClick={remove}>{tr('Удалить профиль', 'Delete profile')}</button>}
+        </div>
+      </form>
+    </Modal>
   );
 }

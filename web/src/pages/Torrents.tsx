@@ -126,7 +126,7 @@ export default function Torrents() {
             ? <span className="pill" style={{ background: 'var(--err-bg)', color: 'var(--err-fg)', cursor: 'default' }}><Dot />{tr('VPN отключён — загрузки остановлены', 'VPN down — transfers stopped')}</span>
             : ov.iface
               ? <span className="pill" style={{ background: 'var(--ok-bg)', color: 'var(--ok-fg)', cursor: 'default' }}><Dot />VPN {ov.iface}{ov.killSwitch ? tr(' · kill switch вкл.', ' · kill switch on') : ''}</span>
-              : <Link className="pill" to="/settings#torrents" style={{ cursor: 'pointer' }}><Dot />{tr('Без привязки к VPN', 'Not bound to VPN')}</Link>)}
+              : <Link className="pill" to="/settings#net" style={{ cursor: 'pointer' }}><Dot />{tr('Без привязки к VPN', 'Not bound to VPN')}</Link>)}
           <span className="pill mono" style={{ cursor: 'default' }}>↓ {fmtSpeed(ov?.down || 0)}</span>
           <span className="pill mono" style={{ cursor: 'default' }}>↑ {fmtSpeed(ov?.up || 0)}</span>
           {ov && <button className="pill" title={tr('Что занимает место в папке загрузок', 'What takes space in the download folder')} onClick={() => setShowDisk(true)} style={ov.diskLow ? { background: 'var(--err-bg)', color: 'var(--err-fg)' } : undefined}>{tr('Свободно', 'Free')} {Math.round(ov.freeGB)} {tr('ГБ', 'GB')}</button>}
@@ -237,7 +237,7 @@ export default function Torrents() {
           <p style={{ margin: 0, fontSize: 'calc(14px * var(--fs))', lineHeight: 1.6 }}>{tr('Торрент-клиент скачивает и одновременно раздаёт данные другим участникам. Ответственность за законность загружаемого и раздаваемого контента лежит на вас. Рекомендуем привязать клиент к VPN в настройках — тогда при обрыве VPN загрузки остановятся.', 'The torrent client downloads and shares data with others at the same time. You are responsible for the legality of the content. We recommend binding the client to a VPN in Settings.')}</p>
           <div className="row">
             <button className="btn btn-r sm" onClick={acceptRisk}>{tr('Понимаю, продолжить', 'I understand, continue')}</button>
-            <Link className="btn btn-l sm" to="/settings#torrents">{tr('Настроить VPN', 'Set up VPN')}</Link>
+            <Link className="btn btn-l sm" to="/settings#net">{tr('Настроить VPN', 'Set up VPN')}</Link>
           </div>
         </Modal>
       )}
