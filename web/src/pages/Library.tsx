@@ -90,7 +90,7 @@ export default function Library() {
         </div>
       </div>
       {error && <div className="err">{error}</div>}
-      {loading && !data && <span className="spin" />}
+      {loading && !data && <div className="loading"><span className="spin lg" /></div>}
       {data && data.items.length === 0 && !libEmpty && (
         <div className="empty">
           {list ? tr('Список пока пуст. Добавляйте фильмы кнопкой «В список» или ♥ на странице фильма.', 'This list is empty. Add titles from their pages.') : t('nothing')}

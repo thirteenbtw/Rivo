@@ -67,7 +67,7 @@ export default function Lists() {
         </div>
       </div>
       {error && <div className="err">{error}</div>}
-      {!data && !error && <span className="spin" />}
+      {!data && !error && <div className="loading"><span className="spin lg" /></div>}
       {data && items.length === 0 && (
         <div className="empty">
           {tr('Пока пусто. Отмечайте фильмы кнопками ♥ и «Смотреть позже» на постерах и страницах фильмов — или импортируйте их из Letterboxd ниже.', 'Nothing here yet. Mark titles with ♥ and “Watch later” on posters and title pages, or import them from Letterboxd below.')}

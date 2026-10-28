@@ -140,7 +140,7 @@ function TopRow({ path, title, more }: { path: string; title: string; more: stri
   if (error) return null;
   return (
     <Section title={title} more={more}>
-      {!data ? <div style={{ height: 230, display: 'grid', placeItems: 'center' }}><span className="spin" /></div> : (
+      {!data ? <div style={{ height: 230, display: 'grid', placeItems: 'center' }}><span className="spin lg" /></div> : (
         <div className="scroll-x" style={{ gap: 18 }}>
           {data.items.slice(0, 10).map((x, i) => (
             <Link key={x.kind + x.id} to={`/catalog/${x.kind}/${x.id}`} className="poster" style={{ flex: 'none', gap: 6 }} {...previewProps(x)}>
@@ -166,7 +166,7 @@ function WideRow({ path, title, more, tag }: { path: string; title: string; more
   if (error) return null;
   return (
     <Section title={title} more={more}>
-      {!data ? <div style={{ height: 180, display: 'grid', placeItems: 'center' }}><span className="spin" /></div> : (
+      {!data ? <div style={{ height: 180, display: 'grid', placeItems: 'center' }}><span className="spin lg" /></div> : (
         <div className="scroll-x" style={{ gap: 10 }}>
           {data.items.filter((x) => x.backdrop).slice(0, 12).map((x) => (
             <Link key={x.kind + x.id} to={`/catalog/${x.kind}/${x.id}`} className="poster" style={{ flex: 'none', width: 260 }} {...previewProps(x)}>
@@ -243,7 +243,7 @@ function Row({ path, title, more }: { path: string; title: string; more: string 
   if (error) return null;
   return (
     <Section title={title} more={more}>
-      {!data ? <div style={{ height: 260, display: 'grid', placeItems: 'center' }}><span className="spin" /></div> : (
+      {!data ? <div style={{ height: 260, display: 'grid', placeItems: 'center' }}><span className="spin lg" /></div> : (
         <div className="scroll-x">
           {data.items.map((x) => <div key={x.kind + x.id} style={{ width: 150, flex: 'none' }}><CatalogCard x={x} /></div>)}
         </div>
@@ -275,7 +275,7 @@ function Grid({ path, title }: { path: string; title: string }) {
       {err && <CatalogError msg={err} />}
       {!loading && !err && items.length === 0 && <div className="empty">{t('nothing')}</div>}
       <div className="grid-posters">{items.map((x) => <CatalogCard key={x.kind + x.id} x={x} showKind={path.includes('/search')} />)}</div>
-      {loading && <span className="spin" />}
+      {loading && <div className="loading" style={{ minHeight: items.length ? 120 : undefined }}><span className="spin lg" /></div>}
       {!loading && page < pages && items.length > 0 && <button className="btn btn-l sm" style={{ alignSelf: 'center' }} onClick={() => load(page + 1)}>{tr('Показать ещё', 'Show more')}</button>}
     </Section>
   );
