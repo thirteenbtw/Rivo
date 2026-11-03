@@ -2,7 +2,6 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api, qs, type Title } from '../api';
 import { useAsync } from '../state';
 import { t, tr } from '../i18n';
-import { TopBar } from '../components/TopBar';
 import { PosterCard } from '../components/PosterCard';
 import { Featured, type Slide } from '../components/Featured';
 import { ContinueSection, ScanBar, localSlides, useHomeData } from '../components/LibraryParts';
@@ -51,7 +50,6 @@ export default function Library() {
 
   return (
     <main className="main">
-      <TopBar types={false} />
       {libEmpty && (
         <div className="empty glass">
           <Icon name="folder" size={32} />

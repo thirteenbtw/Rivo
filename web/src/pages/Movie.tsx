@@ -7,7 +7,6 @@ import { Art, Backdrop, ambientFor, paletteFor } from '../components/Art';
 import { Icon, PlayGlyph } from '../components/Icon';
 import { Modal } from '../components/CastDialog';
 import { Section, useAmbient } from '../components/Shell';
-import { TopBar } from '../components/TopBar';
 import { HeroTrailer } from '../components/Trailer';
 import { personLink } from './Person';
 
@@ -87,7 +86,6 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
 
   return (
     <main className="main" style={{ gap: 28 }}>
-      <TopBar types={false} />
       <section className="hero"
         style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: sky, minHeight: 'clamp(380px, 34vw, 540px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 40px 36px', color: '#FFFFFF', boxShadow: '0 20px 50px var(--sh)' }}>
         {backdrop ? (

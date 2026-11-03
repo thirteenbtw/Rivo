@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError, type CatalogItem, type Title } from '../api';
 import { useApp, useAsync } from '../state';
 import { tr } from '../i18n';
-import { TopBar } from '../components/TopBar';
 import { PosterCard } from '../components/PosterCard';
 import { Section } from '../components/Shell';
 import { Icon } from '../components/Icon';
@@ -42,7 +41,6 @@ export default function Lists() {
 
   return (
     <main className="main">
-      <TopBar types={false} />
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 className="h1">{tr('Мои списки', 'My lists')}</h1>

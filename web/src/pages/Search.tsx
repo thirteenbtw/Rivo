@@ -2,7 +2,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, type Title } from '../api';
 import { useAsync } from '../state';
 import { t, tr } from '../i18n';
-import { TopBar } from '../components/TopBar';
 import { PosterCard } from '../components/PosterCard';
 import { Section } from '../components/Shell';
 
@@ -17,7 +16,6 @@ export default function Search() {
   const people = kind === '' || kind === 'people' ? data?.people || [] : [];
   return (
     <main className="main">
-      <TopBar key={q + kind} />
       <h1 className="h1">{tr('Поиск', 'Search')}: «{q}»</h1>
       {error && <div className="err">{error}</div>}
       {loading && <span className="spin" />}

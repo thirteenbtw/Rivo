@@ -27,7 +27,9 @@ button, input, select, textarea { font-family: inherit; }
 .ac-amber{--acc:#B35F00;--acc-dk:#A35600;--acc-lt:#F2A93B}
 .ac-blue{--acc:#2563EB;--acc-dk:#2257D6;--acc-lt:#7AA7FF}
 .ac-green{--acc:#16803C;--acc-dk:#15763A;--acc-lt:#4CC38A}
-.app{--lav:#A5B4FC;--mint:#8EDCC8;--prog:#3FB79C;--soft:color-mix(in srgb,var(--acc) 14%,var(--bg));background:var(--bg);color:var(--fg);transition:background .35s,color .35s;display:flex;min-height:var(--vh);position:relative;overflow-x:clip}
+.app{--lav:#A5B4FC;--mint:#8EDCC8;--prog:#3FB79C;--soft:color-mix(in srgb,var(--acc) 14%,var(--bg));background:var(--bg);color:var(--fg);transition:background .35s,color .35s;display:flex;flex-direction:column;min-height:var(--vh);position:relative;overflow-x:clip}
+/* the rail and the page, under the title bar */
+.cols{display:flex;align-items:stretch;flex:1 1 auto;min-height:0;position:relative}
 body:has(.app.th-light){background:#EEF1F9}
 body:has(.app.th-dark){background:#141A33}
 body:has(.app.th-oled){background:#000}
@@ -77,10 +79,54 @@ a{color:var(--acct);text-decoration:none}a:hover{opacity:.8}
 .tbl{background:var(--bg);border-radius:12px}
 /* whole 16:9 still on the right of a hero, fading into its blurred copy */
 .bd-img{position:absolute;top:0;right:0;height:100%;aspect-ratio:16/9;object-fit:cover;animation:fadein .8s;-webkit-mask-image:linear-gradient(90deg,#0000 0%,#000 32%);mask-image:linear-gradient(90deg,#0000 0%,#000 32%)}
-.topbar{position:sticky;top:0;z-index:15;padding-bottom:4px;pointer-events:none}
-.topbar>*{pointer-events:auto}
-.tb-side{transition:opacity .2s,transform .2s}
-.topbar.stuck .tb-side{opacity:0;transform:translateY(-8px);pointer-events:none}
+/* Title bar (components/TitleBar.tsx). One strip over the whole window: the
+   mark and the wordmark, back and forward, where you are, the search and the
+   live switches. It rests on the page and turns into frosted glass once
+   content scrolls under it; --tb is its height, which the rail and the pages
+   below use to line up with it. */
+:root{--tb:56px}
+html{scroll-padding-top:calc(var(--tb) + 12px)}
+.titlebar{position:sticky;top:0;z-index:30;flex:none;display:flex;align-items:center;gap:10px;height:var(--tb);padding:0 14px 0 10px;border-bottom:1px solid transparent;transition:background .25s,border-color .25s,box-shadow .25s}
+.titlebar.on{background:color-mix(in srgb,var(--bg) 78%,transparent);border-bottom-color:var(--line);box-shadow:0 14px 30px -26px var(--fg);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6)}
+.tb-left,.tb-right{display:flex;align-items:center;gap:6px;min-width:0}
+.tb-right{justify-content:flex-end;flex:none}
+.tb-brand{display:flex;align-items:center;gap:9px;padding:3px 8px 3px 3px;border-radius:12px;color:var(--fg);flex:none;transition:background .15s}
+.tb-brand:hover{opacity:1;background:color-mix(in srgb,var(--fg) 6%,transparent)}
+.tb-nav{display:flex;gap:2px;flex:none}
+.tb-ico{width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;color:var(--mut);cursor:pointer;flex:none;transition:background .15s,color .15s}
+.tb-ico:hover{background:var(--chip);color:var(--fg)}
+.tb-ico.on{background:var(--soft);color:var(--acct)}
+.tb-sep{width:1px;height:20px;background:var(--line2);margin:0 6px;flex:none}
+.tb-where{font:700 calc(12.5px * var(--fs)) 'Inter',sans-serif;letter-spacing:.01em;color:var(--mut2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tb-search{flex:1 1 auto;min-width:0;max-width:460px;height:38px;margin:0 auto;display:flex;align-items:center;gap:9px;padding:0 10px 0 14px;border-radius:999px;border:1px solid var(--line2);background:var(--input);color:var(--mut);transition:border-color .2s,box-shadow .2s}
+.tb-search:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 18%,transparent)}
+.tb-search input{flex:1;min-width:0;border:0;outline:none;background:transparent;color:var(--fg);font:500 calc(13.5px * var(--fs)) 'Inter',sans-serif}
+.tb-search input::placeholder{color:var(--mut)}
+.tb-kbd{flex:none;padding:2px 6px;border-radius:6px;border:1px solid var(--line2);font-size:calc(10.5px * var(--fs));color:var(--mut);letter-spacing:.02em}
+.tb-x{width:24px;height:24px;flex:none;display:grid;place-items:center;border:0;border-radius:50%;background:var(--chip);color:var(--fg2);cursor:pointer}
+.tb-x:hover{background:var(--line2)}
+.tb-seg{display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--chip);flex:none}
+.tb-pill{height:28px;padding:0 13px;border:0;border-radius:999px;background:transparent;color:var(--mut2);font:600 calc(12.5px * var(--fs)) 'Inter',sans-serif;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s}
+.tb-pill:hover{color:var(--fg)}
+.tb-pill.on{background:var(--bg2);color:var(--fg);box-shadow:0 1px 2px var(--sh),0 0 0 1px var(--line)}
+.tb-live{display:flex;align-items:center;gap:7px;flex:none;max-width:190px;height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line2);color:var(--fg2);font:600 calc(12.5px * var(--fs)) 'Inter',sans-serif}
+.tb-live:hover{opacity:1;background:color-mix(in srgb,var(--fg) 5%,transparent)}
+.tb-live .ic{color:var(--acct);flex:none}
+.tb-live.casting{border-color:color-mix(in srgb,var(--mint) 50%,var(--line2));color:var(--fg)}
+.tb-live-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-dot{width:7px;height:7px;flex:none;border-radius:50%;background:var(--mint);animation:tbpulse 2.2s ease-out infinite}
+@keyframes tbpulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--mint) 65%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+/* the bar gives way before the page does: first the name of the section, then
+   the wordmark (the mark stays — it is the way home), then the columns stack */
+@media (max-width:1000px){.tb-where,.tb-sep{display:none}.tb-live-t{display:none}.tb-live{padding:0 9px}}
+@media (max-width:860px){.tb-brand .wm{display:none}}
+@media (max-width:760px){
+  .titlebar{flex-wrap:wrap;height:auto;min-height:var(--tb);padding:6px 10px;row-gap:8px}
+  .tb-left{order:1}
+  .tb-right{order:2;margin-left:auto}
+  .tb-search{order:3;flex:1 1 100%;max-width:none;margin:0}
+  .tb-sep,.tb-nav{display:none}
+}
 .glass{background:var(--input);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .card{padding:20px;border-radius:16px;border:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
 .card.solid{background:var(--bg2);padding:18px;border-radius:14px;gap:12px}
@@ -115,7 +161,7 @@ html{background:var(--bg,#fff);--sb:color-mix(in srgb,var(--fg,#111214) 22%,tran
 .scroll-x img{-webkit-user-drag:none;user-select:none}
 .scroll-x.dragging{cursor:grabbing;user-select:none}
 .scroll-x.dragging *{pointer-events:none}
-.main{flex:1 1 auto;min-width:0;max-width:1760px;margin:0 auto;padding:0 32px 48px;display:flex;flex-direction:column;gap:32px;position:relative;z-index:1}
+.main{flex:1 1 auto;min-width:0;max-width:1760px;margin:0 auto;padding:16px 32px 48px;display:flex;flex-direction:column;gap:32px;position:relative;z-index:1}
 .main.pad{padding-top:24px;gap:24px}
 .empty{padding:40px 20px;text-align:center;color:var(--mut);font-size:calc(14px * var(--fs));border:1.5px dashed var(--line2);border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:12px}
 .err{padding:10px 14px;border-radius:12px;background:var(--err-bg);color:var(--err-fg);font-size:calc(13px * var(--fs))}
@@ -147,12 +193,12 @@ html{background:var(--bg,#fff);--sb:color-mix(in srgb,var(--fg,#111214) 22%,tran
 input[type=range].rng{accent-color:var(--acc)}
 
 /* the rail scrolls instead of shrinking its buttons when it is taller than the window */
-.app > nav > *{flex-shrink:0}
+.cols > nav > *{flex-shrink:0}
 
 @media (max-width: 720px){
-  .main{padding:0 16px 40px}
-  .app > nav{position:fixed!important;bottom:0;left:0;right:0;flex-direction:row!important;height:64px!important;top:auto!important;border-right:0!important;border-top:1px solid var(--line);background:var(--bg);z-index:20;justify-content:space-around;padding:8px!important}
-  .app > nav .nav-extra{display:none!important}
+  .main{padding:10px 16px 40px}
+  .cols > nav{position:fixed!important;bottom:0;left:0;right:0;flex-direction:row!important;height:64px!important;top:auto!important;border-right:0!important;border-top:1px solid var(--line);background:var(--bg);z-index:20;justify-content:space-around;padding:8px!important}
+  .cols > nav .nav-extra{display:none!important}
   .app{padding-bottom:64px}
   .feat-dots{top:16px;bottom:auto!important}
 }
@@ -230,7 +276,7 @@ input[type=range].rng{accent-color:var(--acc)}
 .set-search input::placeholder{color:var(--mut)}
 .set-cols{display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px;align-items:start}
 @media (max-width:860px){.set-cols{grid-template-columns:minmax(0,1fr)}}
-.set-menu{position:sticky;top:24px;display:flex;flex-direction:column;gap:2px}
+.set-menu{position:sticky;top:calc(var(--tb) + 16px);display:flex;flex-direction:column;gap:2px}
 @media (max-width:860px){.set-menu{position:static}}
 .set-menu h2{margin:14px 12px 6px;font-size:calc(11px * var(--fs));font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
 .set-menu>div:first-child>h2{margin-top:0}
