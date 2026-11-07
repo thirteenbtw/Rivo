@@ -283,7 +283,7 @@ export function Playback({ st, save }: SectionProps) {
 
 // ---------- Transcoding ----------
 
-const encName: Record<string, string> = { nvenc: 'NVIDIA (NVENC)', qsv: 'Intel (Quick Sync)', amf: 'AMD (AMF)', vaapi: 'VAAPI', videotoolbox: 'Apple (VideoToolbox)' };
+const encName: Record<string, string> = { nvenc: 'NVIDIA (NVENC)', qsv: 'Intel (Quick Sync)', amf: 'AMD (AMF)', vaapi: 'VAAPI', videotoolbox: 'Apple (VideoToolbox)', mediacodec: 'Android (MediaCodec)' };
 
 export function Transcoding({ st, save }: SectionProps) {
   const track = useSaver();

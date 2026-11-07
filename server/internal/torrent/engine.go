@@ -101,7 +101,7 @@ func (st Settings) trackerList() []string {
 
 func DefaultSettings(dataDir string) Settings {
 	return Settings{
-		DownloadDir: filepath.Join(dataDir, "Downloads"), Port: 42069, SeedRatio: 1.5, SeedMinutes: 0,
+		DownloadDir: defaultDownloadDir(dataDir), Port: 42069, SeedRatio: 1.5, SeedMinutes: 0,
 		Encryption: "prefer", DHT: true, PEX: true, UPnP: true, BufferMB: 80, BufferPct: 3, MinFreeGB: 5,
 		MaxActive: 3, ScheduleFrom: -1, ScheduleTo: -1, AutoImport: true, KeepWatched: true, Trackers: strings.Join(DefaultTrackers, "\n"),
 	}
@@ -1350,4 +1350,13 @@ func (e *Engine) metaHintLocked(m *managed, s torrent.TorrentStats) string {
 		return "Пиров не найдено: у раздачи, похоже, нет сидов. Попробуйте другую раздачу"
 	}
 	return "Ищем пиров через DHT и трекеры…"
+}
+
+// defaultDownloadDir is <data>/Downloads unless RIVO_DOWNLOAD_DIR names
+// another place (the Android app points it at the phone's Downloads).
+func defaultDownloadDir(dataDir string) string {
+	if d := os.Getenv("RIVO_DOWNLOAD_DIR"); d != "" {
+		return d
+	}
+	return filepath.Join(dataDir, "Downloads")
 }
