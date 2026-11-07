@@ -37,8 +37,54 @@ jobs:
           go test ./...
           GOOS=windows go build -o /dev/null ./cmd/homecinema
 
-  windows:
+  android:
     needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build Android TV app
+        working-directory: tv/android
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          RIVO_VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF" == refs/tags/* ]] || RIVO_VERSION="0.1.0-${GITHUB_SHA::7}"
+          export RIVO_VERSION
+          # A fixed signing key lets a new APK install over the old one.
+          if [ -n "$ANDROID_KEYSTORE_B64" ]; then echo "$ANDROID_KEYSTORE_B64" | base64 -d > app/rivo-tv.jks; fi
+          gradle --no-daemon assembleRelease
+          mkdir -p ../../out
+          cp app/build/outputs/apk/release/app-release.apk "../../out/Rivo-AndroidTV-$RIVO_VERSION.apk"
+
+      - name: Build Tizen and webOS apps
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF" == refs/tags/* ]] || VERSION="0.1.0"
+          npm install -g @webos-tools/cli >/dev/null 2>&1 || echo "webOS CLI not available, skipping .ipk"
+          VERSION="$VERSION" tv/package.sh
+          for f in tv/dist/*.ipk; do [ -e "$f" ] && cp "$f" "out/Rivo-webOS-$VERSION.ipk"; done
+          cp tv/dist/Rivo-tizen-unsigned.zip "out/Rivo-Tizen-$VERSION-unsigned.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rivo-tv-apps
+          path: out/*
+
+  windows:
+    needs: [test, android]
     runs-on: windows-latest
     env:
       TRIPLE: x86_64-pc-windows-msvc
@@ -125,11 +171,19 @@ jobs:
             '{version: $version, pub_date: $date, platforms: {"windows-x86_64": {signature: $sig, url: $url}}}' > latest.json
           cat latest.json
 
+      - name: TV apps for the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/download-artifact@v4
+        with:
+          name: Rivo-tv-apps
+          path: tv-apps
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            tv-apps/*
             desktop/src-tauri/target/release/bundle/nsis/*.exe
             desktop/src-tauri/target/release/bundle/nsis/*.exe.sig
             desktop/src-tauri/target/release/bundle/nsis/latest.json

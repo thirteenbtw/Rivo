@@ -44,6 +44,7 @@ const index: [string, string, string, string][] = [
   ['look', 'Трейлеры при наведении', 'Trailers on hover', 'трейлер youtube'],
   ['look', 'Размер текста', 'Text size', 'шрифт масштаб'],
   ['look', 'Язык интерфейса', 'Interface language', 'язык english'],
+  ['look', 'Режим ТВ', 'TV mode', 'телевизор пульт android tv tizen webos'],
   ['lib', 'Новая папка', 'New folder', 'добавить папку библиотека диск'],
   ['lib', 'Следить за изменениями', 'Watch for changes', 'новые файлы'],
   ['lib', 'Сканировать при запуске', 'Scan on start', 'скан'],

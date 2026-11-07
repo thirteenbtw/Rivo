@@ -5,6 +5,7 @@ import { api, clientCaps, fmtSize, fmtTime, type Item, type Playback, type PlayT
 import { useApp } from '../state';
 import { tr } from '../i18n';
 import { Icon, PauseGlyph, PlayGlyph } from '../components/Icon';
+import { focusEl, isTv, move, tvApp, tvKey } from '../tv';
 
 type Cue = { start: number; end: number; text: string };
 const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -259,11 +260,54 @@ export default function Player() {
     }
   };
 
+  const tv = isTv();
+  useEffect(() => () => tvApp()?.keepAwake?.(false), []);
+  const controls = useRef<HTMLElement>(null);
+  // On a remote: with the controls hidden ←/→ seek and OK pauses; ↑/↓ bring
+  // the controls up and the arrows then walk them (the position bar still
+  // seeks with ←/→). The controls hide again by themselves and give the
+  // arrows back to seeking.
+  const onTvKey = (e: KeyboardEvent, k: string): boolean => {
+    const t = e.target as HTMLElement;
+    const inUi = !!t?.closest?.('header,footer,section,button');
+    if (k === 'GoBack' || k === 'Escape' || k === 'Backspace') return false; // handled below as Escape
+    if (!inUi) {
+      if (k === 'ArrowLeft') { seek(cur - 10); return true; }
+      if (k === 'ArrowRight') { seek(cur + 10); return true; }
+      if (k === 'Enter' || k === ' ') { toggle(); return true; }
+      if (k === 'ArrowUp' || k === 'ArrowDown') {
+        const b = controls.current?.querySelector<HTMLElement>('button');
+        if (b) focusEl(b);
+        return true;
+      }
+      return false;
+    }
+    if (t.getAttribute('role') === 'slider' && (k === 'ArrowLeft' || k === 'ArrowRight')) return false;
+    const d = ({ ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' } as Record<string, 'up' | 'down' | 'left' | 'right'>)[k];
+    if (d) {
+      if (!move(d, root.current!) && d === 'down') t.blur();
+      return true;
+    }
+    return false;
+  };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      const k = tvKey(e);
+      // Remote media keys work everywhere, TV mode or not.
+      switch (k) {
+        case 'MediaPlayPause': e.preventDefault(); toggle(); wake(); return;
+        case 'MediaPlay': e.preventDefault(); video.current?.play().catch(() => {}); wake(); return;
+        case 'MediaPause': e.preventDefault(); video.current?.pause(); wake(); return;
+        case 'MediaFastForward': e.preventDefault(); seek(cur + 30); wake(); return;
+        case 'MediaRewind': e.preventDefault(); seek(cur - 30); wake(); return;
+        case 'MediaStop': e.preventDefault(); close(); return;
+        case 'MediaTrackNext': if (next) { e.preventDefault(); goNext(); } return;
+      }
+      if (tv && onTvKey(e, k)) { e.preventDefault(); wake(); return; }
       if ((e.target as HTMLElement).closest('input,select,textarea')) return;
       switch (e.key) {
-        case ' ': case 'k': case 'л': e.preventDefault(); toggle(); break;
+        case ' ': case 'k': case 'л': case 'Enter': if (e.key === 'Enter' && (e.target as HTMLElement).closest('button,[role=slider]')) break; e.preventDefault(); toggle(); break;
         case 'ArrowLeft': e.preventDefault(); seek(cur - 10); break;
         case 'ArrowRight': e.preventDefault(); seek(cur + 10); break;
         case 'ArrowUp': e.preventDefault(); setVol((v) => Math.min(1, v + 0.1)); break;
@@ -271,7 +315,7 @@ export default function Player() {
         case 'f': case 'F': case 'а': case 'А': fullscreen(); break;
         case 'm': case 'ь': setMuted((m) => !m); break;
         case 's': case 'S': case 'ы': case 'Ы': setPanel((p) => (p === 'subs' ? null : 'subs')); break;
-        case 'Escape': if (panel) setPanel(null); else if (!document.fullscreenElement) close(); break;
+        case 'Escape': case 'GoBack': if (panel) setPanel(null); else if (!document.fullscreenElement || tv) close(); break;
       }
       wake();
     };
@@ -282,7 +326,12 @@ export default function Player() {
   const wake = () => {
     setIdle(false);
     window.clearTimeout(idleTimer.current);
-    idleTimer.current = window.setTimeout(() => { if (!overBars.current) setIdle(true); }, 3000);
+    idleTimer.current = window.setTimeout(() => {
+      if (overBars.current) return;
+      setIdle(true);
+      // Hidden controls give the remote's arrows back to seeking.
+      if (tv && root.current?.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    }, tv ? 5000 : 3000);
   };
   // Listen on the document, not the player div: in fullscreen (WebView2 in
   // particular) mouse events don't always reach the React handler on the
@@ -346,7 +395,7 @@ export default function Player() {
   return (
     <div ref={root} className="player" style={{ position: 'fixed', inset: 0, background: '#000000', color: '#FFFFFF', zIndex: 40, cursor: showUI ? 'default' : 'none', fontFamily: "'Inter',sans-serif" }}>
       <video ref={video} playsInline onClick={toggle} onDoubleClick={fullscreen}
-        onTimeUpdate={onTime} onPlay={() => setPaused(false)} onPause={() => { setPaused(true); saveProgress(true); }}
+        onTimeUpdate={onTime} onPlay={() => { setPaused(false); tvApp()?.keepAwake?.(true); }} onPause={() => { setPaused(true); saveProgress(true); tvApp()?.keepAwake?.(false); }}
         onWaiting={() => setWaiting(true)} onPlaying={() => setWaiting(false)} onCanPlay={() => setWaiting(false)}
         onEnded={() => { saveProgress(true); if (next && autoNext) goNext(); }}
         onError={() => { if (!hlsRef.current && !directFailed()) setErr(tr('Браузер не смог открыть файл. Попробуйте внешний плеер или отправьте на ТВ.', 'The browser could not open this file.')); }}
@@ -446,7 +495,7 @@ export default function Player() {
         </section>
       )}
 
-      <footer onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 20px', background: 'linear-gradient(#00000000,#000000E6 40%)', display: 'flex', flexDirection: 'column', gap: 8, opacity: showUI ? 1 : 0.001, transition: 'opacity .3s', paddingTop: 32 }}>
+      <footer ref={controls} onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 20px', background: 'linear-gradient(#00000000,#000000E6 40%)', display: 'flex', flexDirection: 'column', gap: 8, opacity: showUI ? 1 : 0.001, transition: 'opacity .3s', paddingTop: 32 }}>
         {stream && (
           <div style={{ display: 'flex', gap: 14, fontSize: 'calc(11px * var(--fs))', color: '#A9ADB4' }} className="mono">
             <span>{tr('Загружено', 'Downloaded')} {Math.round(stream.progress * 100)}%</span><span>↓ {fmtSize(stream.down)}/s</span><span>{stream.seeds} {tr('сидов', 'seeds')} · {stream.peers} {tr('пиров', 'peers')}</span>
@@ -471,9 +520,10 @@ export default function Player() {
           <button className="pb" onClick={toggle} aria-label={paused ? tr('Смотреть', 'Play') : tr('Пауза', 'Pause')}>{paused ? <PlayGlyph size={20} /> : <PauseGlyph size={20} />}</button>
           <button className="pb" onClick={() => seek(cur - 10)} aria-label={tr('Назад 10 секунд', 'Back 10 seconds')}><Icon name="back10" /></button>
           <button className="pb" onClick={() => seek(cur + 10)} aria-label={tr('Вперёд 10 секунд', 'Forward 10 seconds')}><Icon name="fwd10" /></button>
-          <button className="pb" onClick={() => setMuted((m) => !m)} aria-label={muted ? tr('Включить звук', 'Unmute') : tr('Выключить звук', 'Mute')}><Icon name={muted || vol === 0 ? 'mute' : 'volume'} /></button>
-          <input type="range" className="rng" min={0} max={1} step={0.05} value={muted ? 0 : vol} aria-label={tr('Громкость', 'Volume')}
-            onChange={(e) => { setVol(Number(e.target.value)); setMuted(false); }} style={{ width: 80 }} />
+          {/* A TV has its own volume on the remote. */}
+          {!tv && <button className="pb" onClick={() => setMuted((m) => !m)} aria-label={muted ? tr('Включить звук', 'Unmute') : tr('Выключить звук', 'Mute')}><Icon name={muted || vol === 0 ? 'mute' : 'volume'} /></button>}
+          {!tv && <input type="range" className="rng" min={0} max={1} step={0.05} value={muted ? 0 : vol} aria-label={tr('Громкость', 'Volume')}
+            onChange={(e) => { setVol(Number(e.target.value)); setMuted(false); }} style={{ width: 80 }} />}
           <span className="hk" style={{ marginLeft: 16, fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }}>{tr('Пробел — пауза · ← → 10 с · F — экран · S — субтитры', 'Space — pause · ← → 10 s · F — fullscreen · S — subtitles')}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
             {next && <button className="pb" onClick={goNext} aria-label={tr('Следующая серия', 'Next episode')} style={{ width: 'auto', padding: '0 12px', borderRadius: 999, font: "600 calc(12px * var(--fs)) 'Inter',sans-serif" }}>{tr('След. серия', 'Next')} ›</button>}
@@ -481,7 +531,7 @@ export default function Player() {
             <button className="pb" onClick={() => setPanel(panel && panel !== 'speed' ? null : 'subs')} aria-label={tr('Дорожки и субтитры', 'Tracks and subtitles')} aria-expanded={!!panel} style={{ background: panel ? '#FFFFFF2E' : undefined }}><Icon name="subs" /></button>
             <button className="pb" onClick={castNow} aria-label={tr('Отправить на ТВ', 'Send to TV')}><Icon name="cast" /></button>
             {state?.local && !hash && <button className="pb" onClick={external} aria-label={tr('Открыть во внешнем плеере', 'Open in external player')}><Icon name="external" /></button>}
-            <button className="pb" onClick={fullscreen} aria-label={tr('Во весь экран', 'Fullscreen')}><Icon name="fullscreen" /></button>
+            {!tvApp() && <button className="pb" onClick={fullscreen} aria-label={tr('Во весь экран', 'Fullscreen')}><Icon name="fullscreen" /></button>}
           </div>
         </div>
       </footer>

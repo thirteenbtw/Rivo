@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/thirteenbtw/homecinema/server/internal/announce"
 	"github.com/thirteenbtw/homecinema/server/internal/api"
 	"github.com/thirteenbtw/homecinema/server/internal/config"
 	"github.com/thirteenbtw/homecinema/server/internal/events"
@@ -100,6 +101,7 @@ func main() {
 	torrents.Start(ctx)
 	go cast.Run(ctx)
 	go srv.RunBackups(ctx)
+	go announce.Run(ctx, port, version)
 
 	// The desktop shell waits for this line to know the port.
 	fmt.Printf("HOMECINEMA_READY http://127.0.0.1:%d\n", port)
