@@ -118,6 +118,19 @@ After that Rivo updates itself. Every few hours it asks GitHub whether a new rel
 
 The interface language is Russian by default; switch it to English in Settings → Access & language.
 
+### Rivo on the TV
+
+Besides Google Cast, the Rivo interface runs right on the TV and is driven by the remote: arrows move the highlight, OK opens, Back closes and goes back, play/pause and seek keys work in the player. On a TV the layout is scaled up for the sofa. TV mode turns on by itself; switch it in Settings → Appearance → TV mode.
+
+| TV | How to install |
+|---|---|
+| **Android TV / Google TV** (Sony, Philips, TCL, Haier, Xiaomi Mi TV and boxes) | Download `Rivo-AndroidTV-<version>.apk` from the release and sideload it (e.g. "Send files to TV" or a USB stick, allowing unknown sources). The app finds the PC running Rivo by itself; otherwise type the address from Settings → Network. |
+| **Samsung (Tizen)** | Easiest: open `http://<PC IP>:8096` in the TV browser. As an app: `tv/package.sh` builds `tv/dist/tizen`, which is signed and installed with Tizen Studio in developer mode. |
+| **LG (webOS)** | TV browser: `http://<PC IP>:8096`. As an app: `Rivo-webOS-<version>.ipk` from the release, installed with `ares-install` in developer mode (the Developer Mode app). |
+| Any other smart TV with a browser | `http://<PC IP>:8096`; TV mode turns on by itself or with `?tv=1` in the address. |
+
+Video plays on the TV itself and the PC transcodes whatever the TV can't decode. To be found, Rivo announces itself over mDNS (`_rivo._tcp`); where the router drops that, the app probes its own subnet instead.
+
 ## How it works
 
 | Part | Where | Stack |
@@ -125,6 +138,7 @@ The interface language is Russian by default; switch it to English in Settings �
 | Media server | [`server/`](server) | Go, SQLite (no cgo), ffmpeg/ffprobe, anacrolix/torrent, go-chromecast |
 | Interface | [`web/`](web) | React 18 + TypeScript + Vite, hls.js |
 | Windows shell | [`desktop/`](desktop) | Tauri 2: window, tray, autostart, magnet links, NSIS installer |
+| TV apps | [`tv/`](tv) | Android TV (WebView, Java, no dependencies), launcher for Tizen and webOS |
 
 The interface is embedded in the server binary, so the same UI opens in a phone's or TV's browser.
 

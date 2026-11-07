@@ -1,0 +1,13 @@
+{
+  "id": "app.rivo.tv",
+  "version": "0.1.0",
+  "vendor": "Rivo",
+  "type": "web",
+  "main": "index.html",
+  "title": "Rivo",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#141A33",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}

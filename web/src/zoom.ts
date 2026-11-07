@@ -2,6 +2,8 @@
 // separate text size. The desktop window has no browser zoom of its own, and
 // in a browser this keeps both across restarts. --zoom lets layouts size
 // themselves to the window (var(--vh)), since zoom also scales vh units.
+import { isTv } from './tv';
+
 const steps = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 export const textSteps = [0.85, 1, 1.15, 1.3, 1.5];
 const KEY = 'hc.zoom';
@@ -33,11 +35,20 @@ function hint(label: string) {
   hintTimer = window.setTimeout(() => { el!.style.display = 'none'; }, 1200);
 }
 
+// On a TV the layout is sized for a 1280-wide screen whatever the TV reports
+// (Android TV WebViews say 960, TV browsers 1920), so text and posters read
+// from the sofa. The user's own zoom step multiplies on top.
+const TV_WIDTH = 1280;
+function base() {
+  return isTv() ? Math.max(0.5, Math.min(3, window.innerWidth / TV_WIDTH)) : 1;
+}
+
 function apply(z: number, show: boolean) {
   current = z;
+  const eff = Math.round(z * base() * 1000) / 1000;
   const root = document.documentElement.style;
-  root.zoom = z === 1 ? '' : String(z);
-  root.setProperty('--zoom', String(z));
+  root.zoom = eff === 1 ? '' : String(eff);
+  root.setProperty('--zoom', String(eff));
   save(KEY, z);
   if (show) hint(`${Math.round(z * 100)}%`);
 }
@@ -58,6 +69,7 @@ function step(dir: number) {
 export function installZoom() {
   apply(current, false);
   setTextScale(text);
+  if (isTv()) window.addEventListener('resize', () => apply(current, false));
   window.addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     if (e.key === '+' || e.key === '=' || e.code === 'Equal' || e.code === 'NumpadAdd') step(1);
