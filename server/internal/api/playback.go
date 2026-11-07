@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -613,7 +614,13 @@ func (s *Server) probeURL(ctx context.Context, key, url string) (*store.File, er
 	p := &probe.Prober{FFprobe: s.Cfg.FFprobe}
 	f, err := p.ProbeURL(ctx, url)
 	if err != nil {
-		return nil, errors.New("не удалось прочитать начало файла: " + err.Error())
+		if !probe.CannotRun(err) {
+			return nil, errors.New("не удалось прочитать начало файла: " + err.Error())
+		}
+		// No working ffprobe (e.g. a broken ffmpeg install in Termux): try
+		// the file directly as if it were H.264 rather than refuse to play.
+		log.Printf("ffprobe не запускается (%v), пробуем воспроизвести напрямую", err)
+		f = store.File{Path: url, BitDepth: 8, VideoCodec: "h264"}
 	}
 	s.probes.mu.Lock()
 	s.probes.m[key] = &f

@@ -152,7 +152,7 @@ func (m *Manager) detect() *HWInfo {
 func (m *Manager) run(timeout time.Duration, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
+	cmd := probe.Command(ctx, m.FFmpeg, args...)
 	probe.HideWindow(cmd)
 	return cmd.CombinedOutput()
 }
@@ -213,7 +213,7 @@ func (m *Manager) Start(o Options) (*Session, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{ID: id, Dir: dir, Opts: o, cancel: cancel, started: time.Now(), lastSeen: time.Now(), done: make(chan struct{})}
 	args := m.buildArgs(o, dir)
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
+	cmd := probe.Command(ctx, m.FFmpeg, args...)
 	probe.HideWindow(cmd)
 	stderr, _ := cmd.StderrPipe()
 	if err := cmd.Start(); err != nil {
@@ -645,7 +645,7 @@ func (m *Manager) Subtitle(ctx context.Context, input string, t store.Track, off
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
+	cmd := probe.Command(ctx, m.FFmpeg, args...)
 	probe.HideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(dst)

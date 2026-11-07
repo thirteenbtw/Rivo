@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -81,7 +80,7 @@ func (m *Manager) runSubJob(j *subJob, input string, t store.Track, from float64
 		args = append(args, "-ss", strconv.FormatFloat(from, 'f', 3, 64), "-copyts", "-start_at_zero")
 	}
 	args = append(args, "-i", input, "-map", fmt.Sprintf("0:%d", t.Index), "-flush_packets", "1", "-f", "webvtt", j.part)
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
+	cmd := probe.Command(ctx, m.FFmpeg, args...)
 	probe.HideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		log.Printf("subtitles %s #%d: %v: %s", filepath.Base(input), t.Index, err, out)
