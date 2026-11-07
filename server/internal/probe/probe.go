@@ -86,7 +86,7 @@ func CannotRun(err error) bool {
 func (p *Prober) run(ctx context.Context, path string, f *store.File, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, p.FFprobe, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path)
+	cmd := Command(ctx, p.FFprobe, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path)
 	hideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
