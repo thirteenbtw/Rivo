@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 
@@ -55,11 +56,11 @@ func DiscoverCast(ctx context.Context, timeout time.Duration) ([]store.Device, e
 	return out, err
 }
 
-// browseIface is nil (all interfaces) where the standard library can list
-// them. On Android 11+ it cannot, and zeroconf then joins no interface at all,
+// browseIface is nil (all interfaces) except on Android: there the standard
+// library cannot list interfaces with their addresses, and zeroconf then joins no interface at all,
 // so hand it the first multicast-capable LAN interface found through anet.
 func browseIface() *net.Interface {
-	if _, err := net.Interfaces(); err == nil {
+	if runtime.GOOS != "android" {
 		return nil
 	}
 	ifs, _ := anet.Interfaces()
