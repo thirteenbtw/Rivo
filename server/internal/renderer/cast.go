@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
 	"github.com/vishen/go-chromecast/application"
 	"github.com/vishen/go-chromecast/dns"
+	"github.com/wlynxg/anet"
 
 	"github.com/thirteenbtw/homecinema/server/internal/store"
 )
@@ -31,7 +33,7 @@ func DiscoverCast(ctx context.Context, timeout time.Duration) ([]store.Device, e
 		seen[d.ID] = true
 		out = append(out, d)
 	}
-	ch, err := dns.DiscoverCastDNSEntries(ctx, nil)
+	ch, err := dns.DiscoverCastDNSEntries(ctx, browseIface())
 	if err == nil {
 		for e := range ch {
 			if e.AddrV4 == nil {
@@ -51,6 +53,26 @@ func DiscoverCast(ctx context.Context, timeout time.Duration) ([]store.Device, e
 		err = nil
 	}
 	return out, err
+}
+
+// browseIface is nil (all interfaces) where the standard library can list
+// them. On Android 11+ it cannot, and zeroconf then joins no interface at all,
+// so hand it the first multicast-capable LAN interface found through anet.
+func browseIface() *net.Interface {
+	if _, err := net.Interfaces(); err == nil {
+		return nil
+	}
+	ifs, _ := anet.Interfaces()
+	for i := range ifs {
+		ifi := ifs[i]
+		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 || ifi.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if ifaceIPv4(ifi) != nil {
+			return &ifi
+		}
+	}
+	return nil
 }
 
 type castRenderer struct {
