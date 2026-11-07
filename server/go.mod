@@ -53,7 +53,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/grandcat/zeroconf v1.0.0 // indirect
+	github.com/grandcat/zeroconf v1.0.0
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/mdns v1.0.7 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect

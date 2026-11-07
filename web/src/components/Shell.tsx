@@ -10,6 +10,7 @@ import { PreviewLayer } from './Preview';
 import { installDragScroll } from './dragScroll';
 import { installTorrentDrop } from './torrentDrop';
 import { loadMarks } from '../marks';
+import { focusPage, setTvNavigate } from '../tv';
 
 // Pages tint the ambient background (e.g. with the featured poster's colors).
 const AmbientCtx = createContext<(colors: string[] | null) => void>(() => {});
@@ -26,8 +27,9 @@ export function Shell() {
   const bgOn = prefs.bg !== 'off';
 
   useEffect(() => installDragScroll(), []);
+  useEffect(() => { setTvNavigate((to) => (typeof to === 'number' ? nav(to) : nav(to))); return () => setTvNavigate(null); }, [nav]);
   useEffect(() => installTorrentDrop(() => nav('/torrents')), [nav]);
-  useEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
+  useEffect(() => { window.scrollTo(0, 0); focusPage(); }, [loc.pathname]);
   useEffect(() => { loadMarks(); }, [profile?.id]);
   // "Ask who's watching": once per app start, when there is a choice.
   const { state } = useApp();

@@ -7,6 +7,7 @@ import { setLang, tr } from '../../i18n';
 import { setTextScale, textScale, textSteps } from '../../zoom';
 import { Icon } from '../../components/Icon';
 import { FolderPicker } from '../../components/FolderPicker';
+import { setTvPref, tvApp, tvDetected, tvPref, type TvPref } from '../../tv';
 import { Badge, Btn, Group, Row, SectionHead, Seg, Select, Switch, recommended, useSaver, type Opt } from './ui';
 
 export type Patch = Partial<Record<keyof S | 'tmdbKey' | 'password', string>>;
@@ -83,6 +84,15 @@ export function Look({ st, save }: SectionProps) {
           <Select id="set-text" value={String(text)} onChange={(v) => { setTextScale(Number(v)); setText(Number(v)); }}
             options={textSteps.map((x) => ({ v: String(x), l: x === 1 ? recommended('100%') : `${Math.round(x * 100)}%` }))} />
         </Row>
+        <Row title={tr('Режим ТВ', 'TV mode')} hint={tr('Управление пультом: стрелки, OK и «Назад», крупный масштаб. Сам включается на Android TV, Tizen, webOS. Только на этом устройстве', 'Remote control: arrows, OK and Back, a larger scale. Turns on by itself on Android TV, Tizen, webOS. This device only')}>
+          <Seg<TvPref> label={tr('Режим ТВ', 'TV mode')} value={tvPref()} onChange={setTvPref}
+            options={[{ v: 'auto', l: tr('Авто', 'Auto') + (tvDetected() ? ' · ' + tr('ТВ', 'TV') : '') }, { v: 'on', l: tr('Вкл', 'On') }, { v: 'off', l: tr('Выкл', 'Off') }]} />
+        </Row>
+        {tvApp()?.changeServer && (
+          <Row title={tr('Компьютер с Rivo', 'Rivo computer')} hint={tvApp()?.server?.() || ''}>
+            <Btn onClick={() => tvApp()?.changeServer?.()}>{tr('Сменить', 'Change')}</Btn>
+          </Row>
+        )}
         <Row title={tr('Язык интерфейса', 'Interface language')} hint={tr('Меню, кнопки и подсказки', 'Menus, buttons and hints')}>
           <Seg label={tr('Язык интерфейса', 'Interface language')} value={st.uiLang} onChange={setUi} options={[{ v: 'ru', l: 'Русский' }, { v: 'en', l: 'English' }]} />
         </Row>

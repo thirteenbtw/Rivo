@@ -67,7 +67,7 @@ export function TopBar({ types = true, catalog = false }: { types?: boolean; cat
             onFocus={() => { if (catalog && !params.get('search') && !params.get('q')) nav('/?search=1'); }} placeholder={catalog ? tr('Найти фильм или сериал', 'Find a movie or show') : t('searchPh')}
             style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', font: "500 calc(14px * var(--fs)) 'Inter',sans-serif", color: 'var(--fg)' }} />
           {catalog && (q || params.get('search')) ? <button type="button" className="ri" style={{ width: 28, height: 28 }} aria-label={tr('Закрыть поиск', 'Close search')} onClick={() => { typed.current = false; setQ(''); nav('/'); }}><Icon name="close" size={14} /></button>
-            : <span className="mono" style={{ fontSize: 'calc(11px * var(--fs))' }}>Ctrl K</span>}
+            : <span className="mono hk" style={{ fontSize: 'calc(11px * var(--fs))' }}>Ctrl K</span>}
         </form>
         {catalog && (
           <div role="group" aria-label={tr('Тип', 'Type')} className="glass" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 999, border: '1px solid var(--line)', boxShadow: '0 6px 20px var(--sh)' }}>

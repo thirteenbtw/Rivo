@@ -57,7 +57,7 @@ export default function Devices() {
             const s = sessions.find((x) => x.deviceId === d.id && x.state !== 'idle');
             const [label, bg, fg] = s ? [tr('Транслирует', 'Casting'), 'var(--soft)', 'var(--acct)'] : d.online ? (d.busy ? [tr('Занят', 'Busy'), 'var(--warn-bg)', 'var(--warn-fg)'] : [tr('Свободен', 'Idle'), 'var(--ok-bg)', 'var(--ok-fg)']) : [tr('Не в сети', 'Offline'), 'var(--chip)', 'var(--mut2)'];
             return (
-              <div key={d.id} className="glass" onClick={() => s && setSel(d.id)}
+              <div key={d.id} className="glass" onClick={() => s && setSel(d.id)} tabIndex={s ? 0 : undefined}
                 style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: 16, borderRadius: 16, border: s ? '2px solid var(--acc)' : '1px solid var(--line)', opacity: d.online ? 1 : 0.6, cursor: s ? 'pointer' : 'default' }}>
                 <div style={{ width: 56, height: 40, borderRadius: 6, background: '#111214', display: 'grid', placeItems: 'center', color: '#FFFFFF' }}><Icon name="tv" /></div>
                 <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 2 }}>

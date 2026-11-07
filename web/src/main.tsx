@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
 import { installZoom } from './zoom';
+import { installTv } from './tv';
 
+installTv();
 installZoom();
 
 createRoot(document.getElementById('root')!).render(

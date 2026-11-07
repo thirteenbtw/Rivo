@@ -5,6 +5,7 @@ import type { CatalogItem } from '../api';
 import { t, tr } from '../i18n';
 import { PlayGlyph } from './Icon';
 import { MuteButton, YouTubeCover, useTrailer } from './Trailer';
+import { isTv } from '../tv';
 
 // Hover preview from the design: rest the pointer on a poster and a larger
 // card grows out of it with the still, then the muted trailer, a short
@@ -20,7 +21,7 @@ const subs = new Set<() => void>();
 const set = (s: State) => { state = s; subs.forEach((f) => f()); };
 const subscribe = (f: () => void) => { subs.add(f); return () => subs.delete(f); };
 
-const canHover = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+const canHover = () => !isTv() && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 const zoom = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--zoom')) || 1;
 
 function close(delay = 120) {
