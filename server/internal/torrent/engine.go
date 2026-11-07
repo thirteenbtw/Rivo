@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/anacrolix/dht/v2"
@@ -270,6 +271,15 @@ func (e *Engine) Restart() error {
 	if err != nil && !cfg.DisableIPv6 {
 		cfg.DisableIPv6 = true // systems without IPv6
 		cl, err = torrent.NewClient(cfg)
+	}
+	// The port is taken (another copy of Rivo, e.g. in Termux next to the
+	// phone app): take one of the next ones rather than not start torrents.
+	for p := st.Port + 1; err != nil && errors.Is(err, syscall.EADDRINUSE) && p <= st.Port+20; p++ {
+		cfg.ListenPort = p
+		cl, err = torrent.NewClient(cfg)
+		if err == nil {
+			log.Printf("torrents: port %d is busy, listening on %d", st.Port, p)
+		}
 	}
 	if err != nil {
 		e.startErr = err.Error()
