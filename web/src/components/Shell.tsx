@@ -11,6 +11,7 @@ import { installDragScroll } from './dragScroll';
 import { installTorrentDrop } from './torrentDrop';
 import { loadMarks } from '../marks';
 import { focusPage, setTvNavigate } from '../tv';
+import { report, setRemoteNavigate } from '../remote';
 
 // Pages tint the ambient background (e.g. with the featured poster's colors).
 const AmbientCtx = createContext<(colors: string[] | null) => void>(() => {});
@@ -30,6 +31,16 @@ export function Shell() {
   useEffect(() => { setTvNavigate((to) => (typeof to === 'number' ? nav(to) : nav(to))); return () => setTvNavigate(null); }, [nav]);
   useEffect(() => installTorrentDrop(() => nav('/torrents')), [nav]);
   useEffect(() => { window.scrollTo(0, 0); focusPage(); }, [loc.pathname]);
+  // A phone may be driving this window: it opens pages and needs to know
+  // what is on screen and whether a text field waits for input.
+  useEffect(() => { setRemoteNavigate((to) => nav(to)); return () => setRemoteNavigate(null); }, [nav]);
+  useEffect(() => { report(true); }, [loc.pathname, loc.search]);
+  useEffect(() => {
+    const f = () => report(true);
+    document.addEventListener('focusin', f);
+    document.addEventListener('focusout', f);
+    return () => { document.removeEventListener('focusin', f); document.removeEventListener('focusout', f); };
+  }, []);
   useEffect(() => { loadMarks(); }, [profile?.id]);
   // "Ask who's watching": once per app start, when there is a choice.
   const { state } = useApp();
@@ -64,6 +75,7 @@ export function Shell() {
           <div aria-hidden="true" className="nav-extra" style={{ width: 24, height: 1, background: 'var(--line)', margin: '8px 0' }} />
           <Nav to="/torrents" icon="download" label={active ? `${t('torrents')}, ${active} ${tr('активных', 'active')}` : t('torrents')} dot={active > 0} />
           <Nav to="/devices" icon="cast" label={t('devices')} />
+          <Nav to="/remote" icon="remote" label={tr('Пульт', 'Remote')} />
           <Nav to="/lists" icon="heart" label={tr('Мои списки', 'My lists')} extra />
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }} className="nav-bottom">
             <button className="ri nav-extra" onClick={() => setPrefs({ theme: themeOrder[(themeOrder.indexOf(theme) + 1) % 3] })}

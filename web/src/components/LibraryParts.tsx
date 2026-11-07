@@ -33,7 +33,7 @@ export function useHomeData() {
 }
 
 // localSlides turns featured library items into carousel slides.
-export function localSlides(items: Item[], openCast: (x: { fileId?: number; title: string }) => void): Slide[] {
+export function localSlides(items: Item[], openCast: (x: { fileId?: number; itemId?: number; title: string }) => void): Slide[] {
   return items.map((film) => {
     const fileId = film.files?.[0]?.id;
     const isNew = Date.now() / 1000 - film.addedAt < 7 * 86400;
@@ -47,7 +47,7 @@ export function localSlides(items: Item[], openCast: (x: { fileId?: number; titl
       </>,
       actions: <>
         {fileId && <Link className="btn btn-w" to={`/play/${fileId}?item=${film.id}`}><PlayGlyph />{film.progress && !film.progress.watched && film.progress.position > 30 ? t('continue') : t('watch')}</Link>}
-        {fileId && <button className="btn btn-g" onClick={() => openCast({ fileId, title: film.title })}><Icon name="cast" size={18} />{t('toTv')}</button>}
+        {fileId && <button className="btn btn-g" onClick={() => openCast({ fileId, itemId: film.id, title: film.title })}><Icon name="cast" size={18} />{t('toTv')}</button>}
         <Link className="btn btn-g" to={itemLink(film)} style={{ color: '#FFFFFF' }}>{t('details')}</Link>
       </>,
     };
