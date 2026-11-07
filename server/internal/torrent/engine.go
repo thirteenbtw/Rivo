@@ -27,11 +27,13 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
+	"github.com/wlynxg/anet"
 	"golang.org/x/net/proxy"
 	"golang.org/x/time/rate"
 
 	"github.com/thirteenbtw/homecinema/server/internal/events"
 	"github.com/thirteenbtw/homecinema/server/internal/library"
+	"github.com/thirteenbtw/homecinema/server/internal/netutil"
 	"github.com/thirteenbtw/homecinema/server/internal/parse"
 	"github.com/thirteenbtw/homecinema/server/internal/store"
 )
@@ -1268,14 +1270,14 @@ func gb(b int64) string {
 // ---------- helpers ----------
 
 func ifaceIPv4(name string) (net.IP, error) {
-	ifc, err := net.InterfaceByName(name)
+	ifc, err := netutil.InterfaceByName(name)
 	if err != nil {
 		return nil, err
 	}
 	if ifc.Flags&net.FlagUp == 0 {
 		return nil, errors.New("интерфейс выключен")
 	}
-	addrs, err := ifc.Addrs()
+	addrs, err := anet.InterfaceAddrsByInterface(ifc)
 	if err != nil {
 		return nil, err
 	}
@@ -1297,7 +1299,7 @@ type IfaceInfo struct {
 // Interfaces lists network interfaces for the "bind to interface" setting.
 func Interfaces() []IfaceInfo {
 	var out []IfaceInfo
-	ifs, _ := net.Interfaces()
+	ifs, _ := anet.Interfaces()
 	for _, i := range ifs {
 		if i.Flags&net.FlagLoopback != 0 {
 			continue

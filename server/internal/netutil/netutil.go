@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/wlynxg/anet"
 )
 
 var private = func() []*net.IPNet {
@@ -46,12 +48,12 @@ func LANAddrs() []string {
 		score int
 	}
 	var cs []cand
-	ifs, _ := net.Interfaces()
+	ifs, _ := anet.Interfaces()
 	for _, i := range ifs {
 		if i.Flags&net.FlagUp == 0 || i.Flags&net.FlagLoopback != 0 {
 			continue
 		}
-		addrs, _ := i.Addrs()
+		addrs, _ := anet.InterfaceAddrsByInterface(&i)
 		for _, a := range addrs {
 			ipn, ok := a.(*net.IPNet)
 			if !ok || ipn.IP.To4() == nil || !IsLAN(ipn.IP) || ipn.IP.IsLinkLocalUnicast() {
@@ -84,12 +86,12 @@ func SubnetAddrFor(device string) net.IP {
 	if dip == nil {
 		return nil
 	}
-	ifs, _ := net.Interfaces()
+	ifs, _ := anet.Interfaces()
 	for _, i := range ifs {
 		if i.Flags&net.FlagUp == 0 {
 			continue
 		}
-		addrs, _ := i.Addrs()
+		addrs, _ := anet.InterfaceAddrsByInterface(&i)
 		for _, a := range addrs {
 			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.To4() != nil && ipn.Contains(dip) {
 				return ipn.IP
