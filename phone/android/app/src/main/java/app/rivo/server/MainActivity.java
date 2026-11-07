@@ -37,7 +37,7 @@ import java.net.URLEncoder;
  */
 public class MainActivity extends Activity {
 
-    private static final String LOCAL = "http://127.0.0.1:" + ServerService.PORT;
+    private static String local() { return "http://127.0.0.1:" + ServerService.port; }
     private final Handler main = new Handler(Looper.getMainLooper());
     private WebView web;
     private TextView status;
@@ -72,6 +72,8 @@ public class MainActivity extends Activity {
         status.setTextColor(0xFFE7ECF7);
         status.setTextSize(18);
         status.setGravity(Gravity.CENTER);
+        status.setPadding(40, 40, 40, 40);
+        status.setTextIsSelectable(true);
         status.setText("Запускаем сервер…");
         root.addView(status, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
@@ -86,7 +88,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         handle(intent);
-        if (loaded) web.loadUrl(LOCAL + pendingPath);
+        if (loaded) web.loadUrl(local() + pendingPath);
     }
 
     // magnet: links open the server's torrent page with the link filled in.
@@ -107,7 +109,7 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             boolean ok = false;
             try {
-                HttpURLConnection c = (HttpURLConnection) new URL(LOCAL + "/api/state").openConnection();
+                HttpURLConnection c = (HttpURLConnection) new URL(local() + "/api/state").openConnection();
                 c.setConnectTimeout(800);
                 c.setReadTimeout(1500);
                 ok = c.getResponseCode() == 200;
@@ -116,16 +118,19 @@ public class MainActivity extends Activity {
             final boolean ready = ok;
             main.post(() -> {
                 if (isFinishing()) return;
+                String fail = ServerService.failure;
                 if (ready) {
                     loaded = true;
-                    web.loadUrl(LOCAL + pendingPath);
+                    web.loadUrl(local() + pendingPath);
                     web.setVisibility(View.VISIBLE);
                     status.setVisibility(View.GONE);
-                } else if (attempt < 120) {
-                    if (attempt == 20) status.setText("Сервер запускается дольше обычного…");
+                } else if (fail != null && attempt > 2) {
+                    status.setText(fail + "\n\n" + ServerService.tail() + "\n\nПерезапустите приложение.");
+                } else if (attempt < 240) {
+                    if (attempt >= 20) status.setText("Сервер запускается дольше обычного…\n\n" + ServerService.tail());
                     main.postDelayed(() -> waitReady(attempt + 1), 500);
                 } else {
-                    status.setText("Сервер не запустился.\nПерезапустите приложение.");
+                    status.setText("Сервер не ответил за 2 минуты.\n\n" + ServerService.tail());
                 }
             });
         }).start();

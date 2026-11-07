@@ -17,7 +17,6 @@ import android.util.Log;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -44,6 +43,16 @@ public class ServerService extends Service {
 
     /** True while the server process is alive; read by the activity. */
     static volatile boolean running;
+    /** The port the server actually listens on (it moves on if 8096 is taken). */
+    static volatile int port = PORT;
+    /** Why the server is not running, for the activity to show; null while fine. */
+    static volatile String failure;
+    private static final java.util.ArrayDeque<String> tail = new java.util.ArrayDeque<>();
+
+    /** The server's last output lines. */
+    static String tail() {
+        synchronized (tail) { return android.text.TextUtils.join("\n", tail); }
+    }
 
     private Process proc;
     private PowerManager.WakeLock wake;
@@ -102,11 +111,15 @@ public class ServerService extends Service {
             dl.mkdirs();
             env.put("RIVO_DOWNLOAD_DIR", dl.getAbsolutePath());
         }
+        failure = null;
+        port = PORT;
+        synchronized (tail) { tail.clear(); }
         try {
             proc = pb.start();
         } catch (Exception e) {
             Log.e(TAG, "start", e);
-            update("Не удалось запустить сервер: " + e.getMessage());
+            failure = "Не удалось запустить сервер: " + e.getMessage();
+            update(failure);
             stopSelf();
             return;
         }
@@ -122,22 +135,36 @@ public class ServerService extends Service {
                 running = false;
                 proc = null;
                 releaseLocks();
-                update("Сервер остановился (код " + code + ")");
+                failure = "Сервер остановился (код " + code + ")";
+                update(failure);
                 stopSelf();
             }
         }, "rivo-wait").start();
-        update("Работает · " + address());
+        update("Запускается…");
     }
 
-    // Copies the server's output to a log file (and logcat) until it exits.
-    private static void pump(Process p, File log) {
-        byte[] buf = new byte[8192];
-        try (InputStream in = p.getInputStream(); OutputStream out = new FileOutputStream(log, false)) {
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
+    // Copies the server's output to a log file (and logcat) until it exits,
+    // keeps the last lines for the activity and picks up the real port from
+    // the "HOMECINEMA_READY http://127.0.0.1:8096" line.
+    private void pump(Process p, File log) {
+        try (java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
+             OutputStream out = new FileOutputStream(log, false)) {
+            String line;
+            while ((line = in.readLine()) != null) {
+                out.write((line + "\n").getBytes());
                 out.flush();
-                Log.i(TAG, new String(buf, 0, n).trim());
+                Log.i(TAG, line);
+                synchronized (tail) {
+                    tail.addLast(line);
+                    while (tail.size() > 15) tail.removeFirst();
+                }
+                int i = line.indexOf("HOMECINEMA_READY ");
+                if (i >= 0) {
+                    try {
+                        port = Integer.parseInt(line.substring(line.lastIndexOf(':') + 1).trim());
+                    } catch (NumberFormatException ignored) { }
+                    update("Работает · " + address());
+                }
             }
         } catch (Exception ignored) { }
     }
@@ -189,12 +216,12 @@ public class ServerService extends Service {
                 if (name.startsWith("tun") || name.startsWith("ppp") || name.startsWith("rmnet")) continue;
                 for (InetAddress a : Collections.list(ni.getInetAddresses())) {
                     if (a instanceof Inet4Address && a.isSiteLocalAddress()) {
-                        return "http://" + a.getHostAddress() + ":" + PORT;
+                        return "http://" + a.getHostAddress() + ":" + port;
                     }
                 }
             }
         } catch (Exception ignored) { }
-        return "http://127.0.0.1:" + PORT;
+        return "http://127.0.0.1:" + port;
     }
 
     private void update(String text) {
