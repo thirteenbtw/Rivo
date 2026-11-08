@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 // Header from the design: back/forward, glass search with type filter, live
 // background toggle and the current TV. On Home the search goes to the
 // catalog (all of TMDB) instead of the local library.
-export function TopBar({ types = true, catalog = false }: { types?: boolean; catalog?: boolean }) {
+export function TopBar({ types = true, catalog = false, home = false }: { types?: boolean; catalog?: boolean; home?: boolean }) {
   const nav = useNavigate();
   const { prefs, setPrefs, devices, cast } = useApp();
   const [params] = useSearchParams();
@@ -53,13 +53,13 @@ export function TopBar({ types = true, catalog = false }: { types?: boolean; cat
   };
 
   return (
-    <header className={'topbar' + (stuck ? ' stuck' : '')} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 16 }}>
+    <header className={'topbar' + (stuck ? ' stuck' : '') + (home ? ' tb-home' : '')} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 16 }}>
       <div className="tb-side" style={{ flex: '1 1 120px', display: 'flex', gap: 4 }}>
         <button className="ri" aria-label={t('back')} onClick={() => nav(-1)}><Icon name="left" /></button>
         <button className="ri" aria-label={t('forward')} onClick={() => nav(1)}><Icon name="right" /></button>
       </div>
       <div style={{ flex: '0 1 520px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-        <form role="search" className="glass" onSubmit={(e) => { e.preventDefault(); go(); }}
+        <form role="search" className="glass tb-search" onSubmit={(e) => { e.preventDefault(); go(); }}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, height: 44, padding: '0 16px', borderRadius: 999, border: '1px solid var(--line)', boxShadow: '0 6px 20px var(--sh)', color: 'var(--mut)' }}>
           <Icon name="search" size={18} />
           <label className="sr" htmlFor="q">{tr('Поиск', 'Search')}</label>
@@ -70,7 +70,7 @@ export function TopBar({ types = true, catalog = false }: { types?: boolean; cat
             : <span className="mono hk" style={{ fontSize: 'calc(11px * var(--fs))' }}>Ctrl K</span>}
         </form>
         {catalog && (
-          <div role="group" aria-label={tr('Тип', 'Type')} className="glass" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 999, border: '1px solid var(--line)', boxShadow: '0 6px 20px var(--sh)' }}>
+          <div role="group" aria-label={tr('Тип', 'Type')} className="glass tb-types" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 999, border: '1px solid var(--line)', boxShadow: '0 6px 20px var(--sh)' }}>
             {[['', t('movies')], ['tv', t('shows')], ['people', t('people')]].map(([k, label]) => {
               const on = k === 'people' ? loc.pathname === '/people' : loc.pathname === '/' && (params.get('kind') || '') === k;
               return <button key={k} className={'pill' + (on ? ' on' : ' ghost')} aria-pressed={on} onClick={() => nav(k === 'people' ? '/people' : k ? `/?kind=${k}` : '/')}>{label}</button>;

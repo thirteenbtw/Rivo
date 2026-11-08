@@ -27,7 +27,7 @@ export function MarkButtons({ x }: { x: Markable }) {
   const { on, toggle } = useToggle(x);
   const rating = useMarks().rating(x);
   return (
-    <div role="group" aria-label={tr('Мои списки', 'My lists')} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+    <div role="group" className="marks" aria-label={tr('Мои списки', 'My lists')} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
       {(['liked', 'later', 'watched'] as MarkList[]).map((l) => (
         <button key={l} className="btn btn-g" aria-pressed={on(l)} onClick={() => toggle(l)}
           style={on(l) ? { background: l === 'liked' ? 'var(--acc)' : '#FFFFFF', color: l === 'liked' ? '#FFFFFF' : '#111214', borderColor: 'transparent' } : undefined}>

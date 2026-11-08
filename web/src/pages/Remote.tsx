@@ -88,7 +88,8 @@ function Pad({ s }: { s: Screen }) {
 
       {p && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {p.poster && <img src={p.poster} alt="" style={{ alignSelf: 'center', width: 'min(200px, 52vw)', aspectRatio: '2/3', objectFit: 'cover', borderRadius: 18, boxShadow: '0 24px 50px #00000066' }} />}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: p.poster ? 'center' : undefined, textAlign: p.poster ? 'center' : undefined }}>
             <span className="disp" style={{ fontSize: `calc(${p.title.length > 30 ? 20 : 24}px * var(--fs))`, fontWeight: 600, lineHeight: 1.1, overflowWrap: 'anywhere' }}>{p.title || tr('Загрузка…', 'Loading…')}</span>
             {p.info && <span style={{ fontSize: 'calc(12px * var(--fs))', color: 'var(--mut)' }}>{p.info}</span>}
             {p.error && <span style={{ fontSize: 'calc(12px * var(--fs))', color: 'var(--err-fg)' }}>{p.error}</span>}

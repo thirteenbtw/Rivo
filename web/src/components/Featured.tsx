@@ -35,7 +35,7 @@ export function Featured({ slides, label }: { slides: Slide[]; label: string }) 
   const [sky, orb] = paletteFor(s.name);
 
   return (
-    <section className="hero" aria-label={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <section className="hero feat" aria-label={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: sky, aspectRatio: '2.2 / 1', minHeight: 340, maxHeight: 'min(640px, calc(var(--vh) - 220px))', display: 'flex', alignItems: 'flex-end', transition: 'background .8s', boxShadow: '0 20px 50px var(--sh)', flex: 'none' }}>
       {s.backdrop ? (
         <Backdrop src={s.backdrop} />
@@ -70,13 +70,13 @@ export function Featured({ slides, label }: { slides: Slide[]; label: string }) 
         </div>
       )}
 
-      <div style={{ position: 'relative', padding: 'clamp(24px, 3vw, 40px)', maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 12, color: '#FFFFFF' }}>
+      <div className="feat-body" style={{ position: 'relative', padding: 'clamp(24px, 3vw, 40px)', maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 12, color: '#FFFFFF' }}>
         <div className="disp" style={{ fontSize: 'calc(clamp(36px,5vw,60px) * var(--fs))', lineHeight: 0.95, fontWeight: 600, letterSpacing: '.04em', overflowWrap: 'anywhere' }}>{s.name}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 'calc(13px * var(--fs))', fontWeight: 600 }}>
           {s.meta}{s.badges}
         </div>
-        {s.overview && <p style={{ margin: 0, opacity: playing ? 0 : 1, maxHeight: playing ? 0 : 200, transition: 'opacity .6s, max-height .6s', fontSize: 'calc(14px * var(--fs))', lineHeight: 1.55, color: '#D4D7DC', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.overview}</p>}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 6 }}>{s.actions}</div>
+        {s.overview && <p className="feat-ov" style={{ margin: 0, opacity: playing ? 0 : 1, maxHeight: playing ? 0 : 200, transition: 'opacity .6s, max-height .6s', fontSize: 'calc(14px * var(--fs))', lineHeight: 1.55, color: '#D4D7DC', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.overview}</p>}
+        <div className="feat-act" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 6 }}>{s.actions}</div>
       </div>
     </section>
   );
