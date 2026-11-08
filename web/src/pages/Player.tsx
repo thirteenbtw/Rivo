@@ -114,7 +114,7 @@ export default function Player() {
         if (!d.fatal) return;
         if (d.type === Hls.ErrorTypes.NETWORK_ERROR) h.startLoad();
         else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) h.recoverMediaError();
-        else setErr(tr('Ошибка воспроизведения потока', 'Stream playback error'));
+        else setErr(tr('Ошибка воспроизведения потока', 'Stream playback error') + ` (${d.type}: ${d.details}${d.error?.message ? ', ' + d.error.message : ''})`);
       });
       h.loadSource(pb.url);
       h.attachMedia(v);

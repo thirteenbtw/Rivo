@@ -189,6 +189,15 @@ func (s *Server) browseFS(w http.ResponseWriter, r *http.Request) error {
 			}
 		} else {
 			home, _ := os.UserHomeDir()
+			// On Android the parents of the app's home are unreadable, so
+			// offer the phone's shared storage directly.
+			if runtime.GOOS == "android" {
+				for _, d := range []entry{{"Память телефона", "/storage/emulated/0"}, {"Загрузки", "/storage/emulated/0/Download"}, {"Фильмы", "/storage/emulated/0/Movies"}} {
+					if _, err := os.ReadDir(d.Path); err == nil {
+						out.Dirs = append(out.Dirs, d)
+					}
+				}
+			}
 			out.Dirs = append(out.Dirs, entry{"Домашняя папка", home}, entry{"/", "/"})
 			if _, err := os.Stat("/media"); err == nil {
 				out.Dirs = append(out.Dirs, entry{"/media", "/media"})

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,10 +73,20 @@ func (p *Prober) ProbeURL(ctx context.Context, url string) (store.File, error) {
 	return f, err
 }
 
+// CannotRun tells that ffprobe itself could not be started (missing, not
+// executable), as opposed to failing on the file.
+func CannotRun(err error) bool {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		return false
+	}
+	return errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrPermission) || errors.Is(err, fs.ErrNotExist)
+}
+
 func (p *Prober) run(ctx context.Context, path string, f *store.File, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, p.FFprobe, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path)
+	cmd := Command(ctx, p.FFprobe, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path)
 	hideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {

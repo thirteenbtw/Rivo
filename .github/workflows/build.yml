@@ -36,6 +36,77 @@ jobs:
           go vet ./...
           go test ./...
           GOOS=windows go build -o /dev/null ./cmd/homecinema
+      - name: Android server binary (Termux)
+        working-directory: server
+        # -checklinkname=0: github.com/wlynxg/anet reads net internals so that
+        # interface lookups work on Android 11+.
+        run: GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-checklinkname=0 -s -w" -o ../rivo-server-android-arm64 ./cmd/homecinema
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rivo-server-android-arm64
+          path: rivo-server-android-arm64
+
+  android-server:
+    # Rivo Server for Android phones: the Go server, ffmpeg and a small app
+    # that runs them as a foreground service (phone/android).
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Web UI and server
+        run: |
+          (cd web && npm ci && npm run build)
+          tools/android/build-server.sh phone/android/app/src/main/jniLibs/arm64-v8a
+
+      - name: ffmpeg cache
+        id: ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-android
+          key: ffmpeg-android-${{ hashFiles('tools/android/build-ffmpeg.sh') }}
+      - name: Build ffmpeg for Android
+        if: steps.ffmpeg.outputs.cache-hit != 'true'
+        run: tools/android/build-ffmpeg.sh ffmpeg-android
+
+      - name: Build APK
+        working-directory: phone/android
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cp ../../ffmpeg-android/*.so app/src/main/jniLibs/arm64-v8a/
+          RIVO_VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF" == refs/tags/* ]] || RIVO_VERSION="0.1.0-${GITHUB_SHA::7}"
+          export RIVO_VERSION
+          if [ -n "$ANDROID_KEYSTORE_B64" ]; then echo "$ANDROID_KEYSTORE_B64" | base64 -d > app/rivo.jks; fi
+          gradle --no-daemon assembleRelease
+          mkdir -p ../../out
+          cp app/build/outputs/apk/release/app-release.apk "../../out/Rivo-Server-Android-$RIVO_VERSION.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rivo-Server-Android
+          path: out/*.apk
 
   android:
     needs: test

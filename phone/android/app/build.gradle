@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+// CI passes the version (tag) and the run number; local builds are 0.1.0 (1).
+def ver = System.getenv('RIVO_VERSION') ?: '0.1.0'
+def code = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int
+
+android {
+    namespace 'app.rivo.server'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'app.rivo.server'
+        minSdk 24
+        targetSdk 35
+        versionCode code
+        versionName ver
+        // The server and ffmpeg are arm64 executables in jniLibs (see
+        // tools/android/build-server.sh); other ABIs are not built.
+        ndk { abiFilters 'arm64-v8a' }
+    }
+
+    // Same signing secrets as the Android TV app; without them the release
+    // is signed with the debug key and updates need a reinstall.
+    signingConfigs {
+        release {
+            def ks = file('rivo.jks')
+            if (ks.exists()) {
+                storeFile ks
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS') ?: 'rivo'
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD') ?: System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig file('rivo.jks').exists() ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    // The executables must be extracted to nativeLibraryDir to be run.
+    packaging {
+        jniLibs { useLegacyPackaging true }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    lint {
+        abortOnError false
+    }
+}

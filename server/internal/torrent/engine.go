@@ -21,17 +21,20 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/anacrolix/dht/v2"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
+	"github.com/wlynxg/anet"
 	"golang.org/x/net/proxy"
 	"golang.org/x/time/rate"
 
 	"github.com/thirteenbtw/homecinema/server/internal/events"
 	"github.com/thirteenbtw/homecinema/server/internal/library"
+	"github.com/thirteenbtw/homecinema/server/internal/netutil"
 	"github.com/thirteenbtw/homecinema/server/internal/parse"
 	"github.com/thirteenbtw/homecinema/server/internal/store"
 )
@@ -99,7 +102,7 @@ func (st Settings) trackerList() []string {
 
 func DefaultSettings(dataDir string) Settings {
 	return Settings{
-		DownloadDir: filepath.Join(dataDir, "Downloads"), Port: 42069, SeedRatio: 1.5, SeedMinutes: 0,
+		DownloadDir: defaultDownloadDir(dataDir), Port: 42069, SeedRatio: 1.5, SeedMinutes: 0,
 		Encryption: "prefer", DHT: true, PEX: true, UPnP: true, BufferMB: 80, BufferPct: 3, MinFreeGB: 5,
 		MaxActive: 3, ScheduleFrom: -1, ScheduleTo: -1, AutoImport: true, KeepWatched: true, Trackers: strings.Join(DefaultTrackers, "\n"),
 	}
@@ -268,6 +271,15 @@ func (e *Engine) Restart() error {
 	if err != nil && !cfg.DisableIPv6 {
 		cfg.DisableIPv6 = true // systems without IPv6
 		cl, err = torrent.NewClient(cfg)
+	}
+	// The port is taken (another copy of Rivo, e.g. in Termux next to the
+	// phone app): take one of the next ones rather than not start torrents.
+	for p := st.Port + 1; err != nil && errors.Is(err, syscall.EADDRINUSE) && p <= st.Port+20; p++ {
+		cfg.ListenPort = p
+		cl, err = torrent.NewClient(cfg)
+		if err == nil {
+			log.Printf("torrents: port %d is busy, listening on %d", st.Port, p)
+		}
 	}
 	if err != nil {
 		e.startErr = err.Error()
@@ -1268,14 +1280,14 @@ func gb(b int64) string {
 // ---------- helpers ----------
 
 func ifaceIPv4(name string) (net.IP, error) {
-	ifc, err := net.InterfaceByName(name)
+	ifc, err := netutil.InterfaceByName(name)
 	if err != nil {
 		return nil, err
 	}
 	if ifc.Flags&net.FlagUp == 0 {
 		return nil, errors.New("интерфейс выключен")
 	}
-	addrs, err := ifc.Addrs()
+	addrs, err := anet.InterfaceAddrsByInterface(ifc)
 	if err != nil {
 		return nil, err
 	}
@@ -1297,7 +1309,7 @@ type IfaceInfo struct {
 // Interfaces lists network interfaces for the "bind to interface" setting.
 func Interfaces() []IfaceInfo {
 	var out []IfaceInfo
-	ifs, _ := net.Interfaces()
+	ifs, _ := anet.Interfaces()
 	for _, i := range ifs {
 		if i.Flags&net.FlagLoopback != 0 {
 			continue
@@ -1348,4 +1360,13 @@ func (e *Engine) metaHintLocked(m *managed, s torrent.TorrentStats) string {
 		return "Пиров не найдено: у раздачи, похоже, нет сидов. Попробуйте другую раздачу"
 	}
 	return "Ищем пиров через DHT и трекеры…"
+}
+
+// defaultDownloadDir is <data>/Downloads unless RIVO_DOWNLOAD_DIR names
+// another place (the Android app points it at the phone's Downloads).
+func defaultDownloadDir(dataDir string) string {
+	if d := os.Getenv("RIVO_DOWNLOAD_DIR"); d != "" {
+		return d
+	}
+	return filepath.Join(dataDir, "Downloads")
 }
