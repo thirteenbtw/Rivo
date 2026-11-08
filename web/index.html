@@ -6,6 +6,15 @@
 <meta name="color-scheme" content="light dark">
 <title>Rivo</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+// Old TV engines (LG webOS 3-4, Tizen 2-4: Chromium 38-53) can't run this
+// interface; they get the lite one (public/lite.html). ?lite=1 / ?lite=0 force it.
+(function () {
+  var s = location.search, old = !(window.CSS && CSS.supports && CSS.supports('--a', '0'));
+  if (/[?&]lite=0/.test(s)) return;
+  if (old || /[?&]lite=1/.test(s)) location.replace('/lite.html' + (location.pathname.length > 1 ? (s ? s + '&' : '?') + 'open=' + encodeURIComponent(location.pathname) : s));
+})();
+</script>
 </head>
 <body>
 <div id="root"></div>
