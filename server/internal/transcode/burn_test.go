@@ -32,3 +32,14 @@ func TestBurnBitmapSubUsesOverlay(t *testing.T) {
 		t.Fatalf("text subtitle: %q", args)
 	}
 }
+
+// Audio gaps are filled, but the sound is never stretched audibly: a large
+// async budget slowed it down to a lower, rasping voice after seeks.
+func TestAudioResampleDoesNotStretch(t *testing.T) {
+	m := &Manager{HWSetting: func() string { return "cpu" }}
+	args := m.buildArgs(Options{Input: "x.m2ts", Start: 600, Audio: -1}, t.TempDir())
+	i := slices.Index(args, "-af")
+	if i < 0 || args[i+1] != "aresample=async=1" {
+		t.Fatalf("audio filter: %q", args)
+	}
+}
