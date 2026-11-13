@@ -104,6 +104,7 @@ type HWInfo struct {
 
 var hwEncoders = []struct{ key, encoder string }{
 	{"nvenc", "h264_nvenc"}, {"qsv", "h264_qsv"}, {"amf", "h264_amf"}, {"vaapi", "h264_vaapi"},
+	{"mediacodec", "h264_mediacodec"}, // Android: the phone's hardware encoder
 }
 
 func (m *Manager) HW() *HWInfo {
@@ -352,10 +353,15 @@ func (m *Manager) buildArgs(o Options, dir string) []string {
 			args = append(args, "-c:v", "h264_amf", "-quality", "speed", "-b:v", bitrate, "-maxrate", bitrate)
 		case "vaapi":
 			args = append(args, "-c:v", "h264_vaapi", "-b:v", bitrate, "-maxrate", bitrate)
+		case "mediacodec":
+			args = append(args, "-c:v", "h264_mediacodec", "-b:v", bitrate)
 		default:
 			args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", bitrate, "-bufsize", "2M")
 		}
-		args = append(args, "-profile:v", "high", "-g", "96", "-keyint_min", "96", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)")
+		if enc != "mediacodec" {
+			args = append(args, "-profile:v", "high")
+		}
+		args = append(args, "-g", "96", "-keyint_min", "96", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)")
 	}
 	if o.CopyAudio {
 		args = append(args, "-c:a", "copy")
