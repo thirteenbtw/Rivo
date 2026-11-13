@@ -3,8 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, type AppState, type CastStatus, type Device, type Prefs, type Profile, type ScanStatus, type TorrentOverview } from './api';
 import { setLang } from './i18n';
+import { eventsUrl, runRemote, screenAttached, type Screen } from './remote';
 
-export type CastTarget = { fileId?: number; torrent?: string; file?: number; start?: number; title?: string; audio?: number; sub?: number };
+export type CastTarget = { fileId?: number; itemId?: number; torrent?: string; file?: number; start?: number; title?: string; audio?: number; sub?: number };
 
 type Ctx = {
   state: AppState | null;
@@ -16,6 +17,7 @@ type Ctx = {
   torrents: TorrentOverview | null;
   devices: Device[];
   cast: CastStatus[];
+  screens: Screen[];
   lastProgress: { itemId: number; position: number; device: string } | null;
   toast: (msg: string) => void;
   castTarget: CastTarget | null;
@@ -38,6 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [torrents, setTorrents] = useState<TorrentOverview | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [cast, setCast] = useState<CastStatus[]>([]);
+  const [screens, setScreens] = useState<Screen[]>([]);
   const [lastProgress, setLastProgress] = useState<Ctx['lastProgress']>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [castTarget, setCastTarget] = useState<CastTarget | null>(null);
@@ -60,7 +63,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Live updates over SSE.
   useEffect(() => {
     if (!state || state.authRequired) return;
-    const es = new EventSource('/api/events');
+    const es = new EventSource(eventsUrl());
+    es.onopen = () => screenAttached(true);
+    es.onerror = () => screenAttached(false);
     es.onmessage = (ev) => {
       try {
         const m = JSON.parse(ev.data);
@@ -69,13 +74,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           case 'torrents': setTorrents(m.data); break;
           case 'devices': setDevices(m.data); break;
           case 'cast': setCast(m.data || []); break;
+          case 'screens': setScreens(m.data || []); break;
+          case 'remote': runRemote(m.data); break;
           case 'progress': setLastProgress(m.data); break;
           case 'letterboxd': window.dispatchEvent(new CustomEvent('hc:letterboxd', { detail: m.data })); break;
         }
       } catch { /* ignore malformed event */ }
     };
     api.get<Device[]>('/api/devices').then(setDevices).catch(() => {});
-    return () => es.close();
+    return () => { es.close(); screenAttached(false); };
   }, [state?.authRequired, state?.profileId]);
 
   const profile = useMemo(() => state?.profiles?.find((p) => p.id === state.profileId) ?? null, [state]);
@@ -107,7 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toastTimer.current = window.setTimeout(() => setToastMsg(null), msg.length > 80 ? 8000 : 3500);
   }, []);
 
-  const value: Ctx = { state, reload, profile, prefs, setPrefs, scan, torrents, devices, cast, lastProgress, toast, castTarget, openCast: setCastTarget };
+  const value: Ctx = { state, reload, profile, prefs, setPrefs, scan, torrents, devices, cast, screens, lastProgress, toast, castTarget, openCast: setCastTarget };
   return (
     <AppCtx.Provider value={value}>
       {children}

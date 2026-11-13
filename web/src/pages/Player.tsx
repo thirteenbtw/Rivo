@@ -6,6 +6,7 @@ import { useApp } from '../state';
 import { tr } from '../i18n';
 import { Icon, PauseGlyph, PlayGlyph } from '../components/Icon';
 import { focusEl, isTv, move, tvApp, tvKey } from '../tv';
+import { reportPlayer, setPlayerHandler, type RemoteCmd } from '../remote';
 
 type Cue = { start: number; end: number; text: string };
 const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -360,6 +361,42 @@ export default function Player() {
     if (next && f) nav(`/play/${f.id}?item=${next.id}`, { replace: true });
   };
 
+  // A phone driving this screen: it sees what plays and sends the controls.
+  const remoteRef = useRef<(c: RemoteCmd) => boolean>(() => false);
+  remoteRef.current = (c) => {
+    const v = video.current;
+    switch (c.cmd) {
+      case 'toggle': toggle(); break;
+      case 'play': v?.play().catch(() => {}); break;
+      case 'pause': v?.pause(); break;
+      case 'seek': if (isFinite(c.to)) seek(c.to); break;
+      case 'seekBy': if (isFinite(c.by)) seek(cur + c.by); break;
+      case 'volume': if (isFinite(c.level)) { setMuted(false); setVol(Math.max(0, Math.min(1, c.level))); } break;
+      case 'mute': setMuted(!!c.on); break;
+      case 'audio': if (pb?.audio.some((a) => a.index === c.index)) pickAudio(c.index); break;
+      case 'sub': if (c.index === -1 || pb?.subs.some((s) => s.index === c.index)) pickSub(c.index); break;
+      case 'close': close(); return true;
+      case 'next': if (next) goNext(); break;
+      default: return false;
+    }
+    wake();
+    return true;
+  };
+  useEffect(() => {
+    setPlayerHandler((c) => remoteRef.current(c));
+    return () => { setPlayerHandler(null); reportPlayer(null); };
+  }, []);
+  const secs = Math.floor(cur);
+  useEffect(() => {
+    reportPlayer({
+      title: pb?.title || '', info: pb ? pb.info || pb.summary : '', paused, waiting, position: secs, duration: Math.floor(duration),
+      volume: Math.round(vol * 100) / 100, muted, error: err || undefined, hasNext: !!next,
+      audio: (pb?.audio || []).map((a) => ({ index: a.index, label: a.label })),
+      subs: (pb?.subs || []).map((s) => ({ index: s.index, label: s.label })),
+      audioSel: pb?.audio.find((a) => a.selected)?.index ?? -1, subSel: subIdx,
+    });
+  }, [pb, secs, duration, paused, waiting, vol, muted, err, next, subIdx]);
+
   const onTime = () => {
     const v = video.current!;
     const t = offset + v.currentTime;
@@ -380,7 +417,7 @@ export default function Player() {
     // The TV picker lives outside the player, so it can't show over a fullscreen element.
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (hash) openCast({ torrent: hash, file: torrentFile, title: pb?.title });
-    else openCast({ fileId: Number(fileId), start: cur, title: pb?.title, audio: opts.current.audio !== '' ? Number(opts.current.audio) : undefined, sub: subIdx >= 0 ? subIdx : undefined });
+    else openCast({ fileId: Number(fileId), itemId: itemId || undefined, start: cur, title: pb?.title, audio: opts.current.audio !== '' ? Number(opts.current.audio) : undefined, sub: subIdx >= 0 ? subIdx : undefined });
   };
   const external = async () => {
     try { await api.post(`/api/files/${fileId}/external?start=${Math.floor(cur)}`); video.current?.pause(); toast(tr('Открыто во внешнем плеере', 'Opened in external player')); } catch (e: any) { toast(e.message); }

@@ -24,6 +24,7 @@ import (
 	"github.com/thirteenbtw/homecinema/server/internal/netutil"
 	"github.com/thirteenbtw/homecinema/server/internal/probe"
 	"github.com/thirteenbtw/homecinema/server/internal/ratings"
+	"github.com/thirteenbtw/homecinema/server/internal/remote"
 	"github.com/thirteenbtw/homecinema/server/internal/renderer"
 	"github.com/thirteenbtw/homecinema/server/internal/store"
 	"github.com/thirteenbtw/homecinema/server/internal/tmdb"
@@ -50,6 +51,7 @@ type Server struct {
 	ratings *ratings.Client
 	lb      lbState
 	lbHTTP  *http.Client
+	screens *remote.Hub
 }
 
 func (s *Server) Handler() http.Handler {
@@ -57,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	s.probes = newProbeCache()
 	s.ratings = ratings.New()
 	s.lbHTTP = &http.Client{Timeout: 20 * time.Second}
+	s.screens = remote.New(s.Bus)
 	go s.letterboxdLoop()
 	go s.removeWatchedLoop()
 	mux := http.NewServeMux()
@@ -179,6 +182,10 @@ func (s *Server) routes(mux *http.ServeMux) {
 	h("GET /api/cast", s.castStatus)
 	h("POST /api/cast/{id}/load", s.castLoad)
 	h("POST /api/cast/{id}/{action}", s.castControl)
+	// Rivo windows driven from another one (the phone as a remote for the TV)
+	h("GET /api/screens", s.listScreens)
+	h("POST /api/screens/{id}/state", s.screenState)
+	h("POST /api/screens/{id}/command", s.screenCommand)
 
 	// settings & maintenance
 	h("GET /api/settings", s.getSettings)
@@ -438,6 +445,18 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	ch, cancel := s.Bus.Subscribe()
 	defer cancel()
+	// A window that can be driven by a remote names itself here and gets its
+	// commands on the same stream.
+	var cmds <-chan []byte
+	if q := r.URL.Query(); remote.ValidID(q.Get("screen")) {
+		addr := ""
+		if ip := netutil.RemoteIP(r); ip != nil {
+			addr = ip.String()
+		}
+		c, detach := s.screens.Attach(remote.Screen{ID: q.Get("screen"), Name: q.Get("name"), TV: q.Get("tv") == "1", Addr: addr})
+		defer detach()
+		cmds = c
+	}
 	ping := time.NewTicker(20 * time.Second)
 	defer ping.Stop()
 	fmt.Fprint(w, "retry: 3000\n\n")
@@ -447,6 +466,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case msg := <-ch:
+			fmt.Fprintf(w, "data: %s\n\n", msg)
+			fl.Flush()
+		case msg := <-cmds:
 			fmt.Fprintf(w, "data: %s\n\n", msg)
 			fl.Flush()
 		case <-ping.C:

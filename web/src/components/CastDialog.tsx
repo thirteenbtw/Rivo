@@ -5,6 +5,7 @@ import { api, fmtTime } from '../api';
 import { useApp } from '../state';
 import { t, tr } from '../i18n';
 import { Icon } from './Icon';
+import { playPath, screenId, sendRemote } from '../remote';
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
 
 // "Send to TV" device picker (FR-12): discovered devices plus manual IP.
 export function CastDialog() {
-  const { castTarget, openCast, devices, toast } = useApp();
+  const { castTarget, openCast, devices, screens, toast } = useApp();
   const nav = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -57,6 +58,20 @@ export function CastDialog() {
     } finally { setBusy(null); }
   };
 
+  // Rivo open on the TV (or another PC): it plays the title itself, and this
+  // device becomes its remote.
+  const sendScreen = async (id: string) => {
+    setBusy(id); setErr(null);
+    try {
+      await sendRemote(id, { cmd: 'open', path: playPath(castTarget) });
+      close();
+      nav(`/remote/${id}`);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally { setBusy(null); }
+  };
+  const rivo = screens.filter((s) => s.id !== screenId()).sort((a, b) => Number(b.tv) - Number(a.tv));
+
   const addIp = async () => {
     setErr(null); setBusy('ip');
     try {
@@ -75,8 +90,18 @@ export function CastDialog() {
     <Modal title={t('pickDevice')} onClose={close}>
       {castTarget.title && <div className="sub">{castTarget.title}{castTarget.start ? ` · ${tr('с', 'from')} ${fmtTime(castTarget.start)}` : ''}</div>}
       {err && <div className="err">{err}</div>}
-      {online.length === 0 && <div className="sub">{t('noDevices')}</div>}
+      {online.length === 0 && rivo.length === 0 && <div className="sub">{t('noDevices')}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rivo.map((s) => (
+          <button key={s.id} className="btn btn-l" style={{ justifyContent: 'flex-start', height: 'auto', padding: '12px 16px', borderRadius: 14 }} disabled={!!busy} onClick={() => sendScreen(s.id)}>
+            <Icon name={s.tv ? 'tv' : 'film'} />
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+              <span>{s.name}</span>
+              <span className="sub" style={{ fontWeight: 500 }}>{tr('Rivo · здесь откроется пульт', 'Rivo · the remote opens here')} · {s.addr}{s.state?.player ? ` · ${tr('сейчас играет', 'playing')}` : ''}</span>
+            </span>
+            {busy === s.id && <span className="spin" style={{ marginLeft: 'auto' }} />}
+          </button>
+        ))}
         {online.map((d) => (
           <button key={d.id} className="btn btn-l" style={{ justifyContent: 'flex-start', height: 'auto', padding: '12px 16px', borderRadius: 14 }} disabled={!!busy} onClick={() => send(d.id)}>
             <Icon name="tv" />
