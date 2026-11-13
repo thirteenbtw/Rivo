@@ -182,7 +182,7 @@ export default function Torrents() {
                         const sl = statusLabel[r.status] || [r.status, r.status];
                         return (
                           <Fragment key={r.hash}>
-                            <tr style={{ background: isSel ? 'var(--soft)' : undefined, cursor: 'pointer' }} onClick={() => setSel(r.hash)}>
+                            <tr style={{ background: isSel ? 'var(--soft)' : undefined, cursor: 'pointer' }} onClick={() => setSel(r.hash)} tabIndex={0}>
                               <td className="td" style={{ maxWidth: 0, width: '100%' }}>
                                 <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name}>{r.name || r.hash}</div>
                                 <div className="sub">{r.size ? fmtSize(r.size) : '—'}{r.fileCount > 1 ? ` · ${r.fileCount} ${tr('файлов', 'files')}` : ''}{r.mode === 'stream' ? ` · ${tr('последовательно', 'sequential')}` : ''}{!r.keep ? ` · ${tr('удалится после просмотра', 'deleted after watching')}` : ''}{r.error ? ` · ${r.error}` : ''}</div>

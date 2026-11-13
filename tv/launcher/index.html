@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rivo</title>
+<!--
+  Rivo launcher for Samsung Tizen and LG webOS TVs. It finds the PC running
+  Rivo on the home network (or takes its address), remembers it and opens the
+  Rivo interface there; the interface switches to TV mode by itself
+  (web/src/tv.ts). Packaged by tv/package.sh.
+-->
+<style>
+  /* plain colors and margins, no CSS variables or flex gap: older webOS and
+     Tizen engines (Chromium 38-53) ignore them */
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#141A33;color:#E7ECF7;font:400 22px/1.4 'Inter','Samsung One',sans-serif}
+  body{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center}
+  .wrap{width:760px;max-width:92vw;text-align:center}
+  .wrap>*{margin:0 auto 14px}
+  .logo{font:900 76px/1 'Inter',sans-serif;letter-spacing:-.02em}
+  .logo i{font-style:normal;position:relative}
+  .logo i::after{content:"";position:absolute;left:50%;top:.2em;width:.15em;height:.15em;margin-left:-.075em;background:#8EDCC8;transform:rotate(45deg)}
+  h1{margin:8px 0 0;font-size:34px}
+  .sub{color:#9AA3C7;max-width:640px}
+  .status{color:#A5B4FC;min-height:1.4em;margin-top:10px}
+  .list{width:560px;max-width:100%}
+  .list button{display:block;width:100%;margin-bottom:10px}
+  button,input{font:inherit;color:#E7ECF7;border-radius:16px;border:2px solid #353E68;background:#252D51;height:64px;padding:0 24px}
+  button{cursor:pointer}
+  button:focus,input:focus{outline:none;background:#5B6EE1;border-color:#fff}
+  input:focus{background:#252D51;border-color:#5B6EE1}
+  .row{display:-webkit-flex;display:flex;width:560px;max-width:100%}
+  .row button{margin-left:10px}
+  .row input{-webkit-flex:1;flex:1;min-width:0}
+  .hint{color:#9AA3C7;font-size:18px;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo" aria-label="Rivo">r<i>ı</i>vo</div>
+  <h1 id="title">Подключение к компьютеру</h1>
+  <div class="sub" id="sub">Rivo должен быть запущен на ПК в той же сети, что и телевизор.</div>
+  <div class="status" id="status"></div>
+  <div class="list" id="list"></div>
+  <div class="hint">или введите адрес из Rivo на ПК (Настройки → Сеть)</div>
+  <div class="row">
+    <input id="addr" type="text" inputmode="url" placeholder="192.168.1.10:8096" autocomplete="off">
+    <button id="go">Подключить</button>
+  </div>
+  <button id="again">Искать снова</button>
+</div>
+<script>
+(function () {
+  var KEY = 'rivo.server', PORTS = [8096, 8097];
+  var $ = function (id) { return document.getElementById(id); };
+  var found = {}, stop = false, saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+
+  // Remote keys: Tizen only delivers media keys to apps that ask for them.
+  try {
+    var dev = window.tizen && tizen.tvinputdevice;
+    if (dev) ['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaFastForward', 'MediaRewind'].forEach(function (k) { try { dev.registerKey(k); } catch (e) {} });
+  } catch (e) {}
+
+  function exit() {
+    try { tizen.application.getCurrentApplication().exit(); return; } catch (e) {}
+    try { webOS.platformBack(); return; } catch (e) {}
+    try { window.close(); } catch (e) {}
+  }
+
+  // Any HTTP answer on the port means something is listening; a no-cors
+  // request can't read it, but reaching it is enough to offer the address.
+  function ping(url, ms) {
+    return new Promise(function (ok) {
+      var done = false;
+      var end = function (v) { if (!done) { done = true; ok(v); } };
+      // fetch in no-cors mode where there is one; older TV engines lack it,
+      // and an XMLHttpRequest can't reach another origin without CORS, so
+      // there the probe loads Rivo's icon as an image instead.
+      setTimeout(function () { end(false); }, ms);
+      try {
+        if (window.fetch) {
+          fetch(url + '/api/state', { mode: 'no-cors', cache: 'no-store' }).then(function () { end(true); }, function () { end(false); });
+        } else {
+          var img = new Image();
+          img.onload = function () { end(true); };
+          img.onerror = function () { end(false); };
+          img.src = url + '/favicon.svg?t=' + Date.now();
+        }
+      } catch (e) { end(false); }
+    });
+  }
+
+  function open(url) {
+    stop = true;
+    try { localStorage.setItem(KEY, url); } catch (e) {}
+    $('status').textContent = 'Открываем ' + url.replace('http://', '') + '…';
+    window.location.href = url + '/?tv=1';
+  }
+
+  function add(url) {
+    if (found[url]) return;
+    found[url] = true;
+    var b = document.createElement('button');
+    b.textContent = 'Rivo   ' + url.replace('http://', '');
+    b.onclick = function () { open(url); };
+    $('list').appendChild(b);
+    $('status').textContent = 'Найден компьютер с Rivo:';
+    if (Object.keys(found).length === 1) b.focus();
+  }
+
+  // The TV's own address tells the subnet; without it, try the usual home ones.
+  function subnets(cb) {
+    var out = [];
+    var push = function (ip) { var m = /^(\d+\.\d+\.\d+\.)\d+$/.exec(ip || ''); if (m && out.indexOf(m[1]) < 0) out.push(m[1]); };
+    var finish = function () {
+      ['192.168.1.', '192.168.0.', '192.168.31.', '192.168.88.', '192.168.100.', '10.0.0.', '192.168.2.', '192.168.50.'].forEach(push);
+      cb(out);
+    };
+    try { if (window.webapis && webapis.network) push(webapis.network.getIp()); } catch (e) {}
+    try {
+      if (window.webOS && webOS.service) {
+        webOS.service.request('luna://com.palm.connectionmanager', { method: 'getStatus', onSuccess: function (r) {
+          push(r && r.wired && r.wired.ipAddress); push(r && r.wifi && r.wifi.ipAddress); finish();
+        }, onFailure: finish });
+        return;
+      }
+    } catch (e) {}
+    finish();
+  }
+
+  function scan() {
+    stop = false;
+    found = {};
+    $('list').innerHTML = '';
+    $('status').textContent = 'Ищем Rivo в сети…';
+    subnets(function (nets) {
+      var q = [];
+      PORTS.forEach(function (port) { nets.forEach(function (n) { for (var i = 1; i < 255; i++) q.push('http://' + n + i + ':' + port); }); });
+      var running = 0, i = 0;
+      var next = function () {
+        if (stop) return;
+        while (running < 48 && i < q.length) {
+          (function (url) {
+            running++;
+            ping(url, 1500).then(function (ok) { running--; if (ok) add(url); next(); });
+          })(q[i++]);
+        }
+        if (running === 0 && i >= q.length && !Object.keys(found).length) $('status').textContent = 'Rivo в сети не найден. Введите адрес вручную.';
+      };
+      next();
+    });
+  }
+
+  function manual() {
+    var v = $('addr').value.trim();
+    if (!v) return;
+    if (!/^https?:\/\//.test(v)) v = 'http://' + v;
+    if (!/:\d+$/.test(v.replace(/\/$/, ''))) v = v.replace(/\/$/, '') + ':8096';
+    v = v.replace(/\/$/, '');
+    $('status').textContent = 'Проверяем ' + v.replace('http://', '') + '…';
+    ping(v, 4000).then(function (ok) { if (ok) open(v); else $('status').textContent = 'Нет ответа от ' + v.replace('http://', '') + '. Проверьте адрес и что ПК в той же сети.'; });
+  }
+
+  $('go').onclick = manual;
+  $('again').onclick = scan;
+  $('addr').addEventListener('keydown', function (e) { if (e.keyCode === 13) manual(); });
+  // The LG Magic Remote pointer takes focus away; the first arrow press brings it back.
+  window.addEventListener('focus', function () { if (!document.activeElement || document.activeElement === document.body) $('again').focus(); });
+
+  // Arrow keys walk the controls top to bottom; Back leaves the app.
+  document.addEventListener('keydown', function (e) {
+    var k = e.keyCode;
+    if (k === 10009 || k === 461 || (k === 8 && document.activeElement !== $('addr'))) { e.preventDefault(); exit(); return; }
+    if (k < 37 || k > 40) return;
+    // In the text field Left/Right move the caret.
+    if ((k === 37 || k === 39) && document.activeElement === $('addr')) return;
+    var all = Array.prototype.slice.call(document.querySelectorAll('button,input'));
+    var at = all.indexOf(document.activeElement);
+    var to = all[Math.max(0, Math.min(all.length - 1, at + (k === 40 || k === 39 ? 1 : -1)))];
+    if (to) { e.preventDefault(); to.focus(); }
+  });
+
+  if (saved) {
+    $('addr').value = saved.replace('http://', '');
+    $('status').textContent = 'Подключаемся к ' + saved.replace('http://', '') + '…';
+    // A moment to press OK on "Искать снова" and pick another PC instead.
+    var cancelled = false;
+    $('again').onclick = function () { cancelled = true; $('again').onclick = scan; scan(); };
+    ping(saved, 4000).then(function (ok) {
+      if (cancelled) return;
+      if (ok) { setTimeout(function () { if (!cancelled) open(saved); }, 1500); return; }
+      $('title').textContent = 'Компьютер не отвечает';
+      $('sub').textContent = 'Не удаётся открыть ' + saved.replace('http://', '') + '. Проверьте, что Rivo запущен на ПК. Ищем снова…';
+      scan();
+    });
+  } else {
+    scan();
+  }
+  $('again').focus();
+})();
+</script>
+</body>
+</html>

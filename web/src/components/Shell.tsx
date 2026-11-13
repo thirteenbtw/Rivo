@@ -4,12 +4,15 @@ import { useApp } from '../state';
 import { t, tr } from '../i18n';
 import { Icon } from './Icon';
 import { CastDialog } from './CastDialog';
+import { MobileNav } from './MobileNav';
 import { TitleBar } from './TitleBar';
 import { Dots } from './Dots';
 import { PreviewLayer } from './Preview';
 import { installDragScroll } from './dragScroll';
 import { installTorrentDrop } from './torrentDrop';
 import { loadMarks } from '../marks';
+import { focusPage, setTvNavigate } from '../tv';
+import { report, setRemoteNavigate } from '../remote';
 
 // Pages tint the ambient background (e.g. with the featured poster's colors).
 const AmbientCtx = createContext<(colors: string[] | null) => void>(() => {});
@@ -26,8 +29,19 @@ export function Shell() {
   const bgOn = prefs.bg !== 'off';
 
   useEffect(() => installDragScroll(), []);
+  useEffect(() => { setTvNavigate((to) => (typeof to === 'number' ? nav(to) : nav(to))); return () => setTvNavigate(null); }, [nav]);
   useEffect(() => installTorrentDrop(() => nav('/torrents')), [nav]);
-  useEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
+  useEffect(() => { window.scrollTo(0, 0); focusPage(); }, [loc.pathname]);
+  // A phone may be driving this window: it opens pages and needs to know
+  // what is on screen and whether a text field waits for input.
+  useEffect(() => { setRemoteNavigate((to) => nav(to)); return () => setRemoteNavigate(null); }, [nav]);
+  useEffect(() => { report(true); }, [loc.pathname, loc.search]);
+  useEffect(() => {
+    const f = () => report(true);
+    document.addEventListener('focusin', f);
+    document.addEventListener('focusout', f);
+    return () => { document.removeEventListener('focusin', f); document.removeEventListener('focusout', f); };
+  }, []);
   useEffect(() => { loadMarks(); }, [profile?.id]);
   // "Ask who's watching": once per app start, when there is a choice.
   const { state } = useApp();
@@ -44,6 +58,9 @@ export function Shell() {
   // those; on a library page the page itself already decides what it shows.
   const catalog = loc.pathname === '/' || loc.pathname === '/people' || loc.pathname.startsWith('/person');
   const types = catalog || loc.pathname === '/search';
+  // Home as a shelf, not a search or a filtered list: on a phone the bar there
+  // shows only the type switch (the search is a tab of its own).
+  const home = loc.pathname === '/' && !['search', 'q', 'genre', 'list', 'sort'].some((k) => new URLSearchParams(loc.search).has(k));
   const theme = prefs.theme;
   // The page scrollbar belongs to <html>, so it needs the theme tokens too.
   useEffect(() => {
@@ -57,15 +74,16 @@ export function Shell() {
     <AmbientCtx.Provider value={setColors}>
       <div className={`app th-${theme} ac-${prefs.accent}${prefs.calm ? ' calm' : ''}`}>
         {bgOn && <Dots intensity={prefs.intensity} />}
-        <TitleBar catalog={catalog} types={types} />
+        <TitleBar catalog={catalog} types={types} home={home} />
         <div className="cols">
-          <nav aria-label={tr('Разделы', 'Sections')} style={{ flex: '0 0 64px', padding: '8px 10px 16px', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'sticky', top: 'var(--tb)', height: 'calc(var(--vh) - var(--tb))', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', zIndex: 2 }}>
+          <nav className="rail" aria-label={tr('Разделы', 'Sections')} style={{ flex: '0 0 64px', padding: '8px 10px 16px', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'sticky', top: 'var(--tb)', height: 'calc(var(--vh) - var(--tb))', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', zIndex: 2 }}>
             <Nav to="/" icon="home" label={t('home')} end />
             <Nav to="/library/movies" icon="film" label={t('movies')} />
             <Nav to="/library/shows" icon="tv" label={t('shows')} />
             <div aria-hidden="true" className="nav-extra" style={{ width: 24, height: 1, background: 'var(--line)', margin: '8px 0' }} />
             <Nav to="/torrents" icon="download" label={active ? `${t('torrents')}, ${active} ${tr('активных', 'active')}` : t('torrents')} dot={active > 0} />
             <Nav to="/devices" icon="cast" label={t('devices')} />
+            <Nav to="/remote" icon="remote" label={tr('Пульт', 'Remote')} />
             <Nav to="/lists" icon="heart" label={tr('Мои списки', 'My lists')} extra />
             <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }} className="nav-bottom">
               <button className="ri nav-extra" onClick={() => setPrefs({ theme: themeOrder[(themeOrder.indexOf(theme) + 1) % 3] })}
@@ -80,6 +98,7 @@ export function Shell() {
             </div>
           </nav>
           <PageBoundary key={loc.pathname}><Outlet /></PageBoundary>
+          <MobileNav />
           <CastDialog />
           <PreviewLayer />
         </div>

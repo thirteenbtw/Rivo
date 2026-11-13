@@ -100,7 +100,7 @@ function Detail({ d }: { d: TitleResp }) {
 
   return (
     <main className="main" style={{ gap: 28, paddingTop: 16 }}>
-      <section className="hero" style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: sky, minHeight: 'clamp(380px, 34vw, 540px)', display: 'flex', flexDirection: 'column', padding: '20px 40px 36px', color: '#FFFFFF', boxShadow: '0 20px 50px var(--sh)' }}>
+      <section className="hero title-hero" style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: sky, minHeight: 'clamp(380px, 34vw, 540px)', display: 'flex', flexDirection: 'column', padding: '20px 40px 36px', color: '#FFFFFF', boxShadow: '0 20px 50px var(--sh)' }}>
         {x.backdrop && <Backdrop src={x.backdrop} />}
         <HeroTrailer trailer={x.trailer ? { kind: x.kind, id: x.id } : null} />
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,#000000D0 0%,#00000080 55%,#00000020 85%)' }} />
@@ -110,7 +110,7 @@ function Detail({ d }: { d: TitleResp }) {
           <span style={{ color: '#C9CCD1' }}>›</span><span>{x.title}</span>
         </nav>
         <div style={{ position: 'relative', display: 'flex', gap: 28, alignItems: 'flex-end', marginTop: 'auto', paddingTop: 28, flexWrap: 'wrap' }}>
-          <Art src={x.poster} title={x.title} style={{ width: 180, aspectRatio: '2/3', borderRadius: 14, flex: 'none', boxShadow: '0 16px 40px #00000080' }} />
+          <Art className="th-poster" src={x.poster} title={x.title} style={{ width: 180, aspectRatio: '2/3', borderRadius: 14, flex: 'none', boxShadow: '0 16px 40px #00000080' }} />
           <div style={{ flex: '1 1 360px', display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 680 }}>
             <div className="disp" style={{ fontSize: 'calc(clamp(38px,6vw,68px) * var(--fs))', lineHeight: 0.95, fontWeight: 600, letterSpacing: '.04em' }}>{x.title}</div>
             {x.origTitle && x.origTitle !== x.title && <div style={{ fontSize: 'calc(14px * var(--fs))', color: '#D4D7DC' }}>{x.origTitle}</div>}
@@ -124,7 +124,7 @@ function Detail({ d }: { d: TitleResp }) {
               </span>
             </div>
             {x.tagline && <div style={{ fontSize: 'calc(14px * var(--fs))', fontStyle: 'italic', color: '#D4D7DC' }}>{x.tagline}</div>}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
+            <div className="th-act" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
               {libLink && <Link className="btn btn-w" to={libLink}><PlayGlyph />{tr('Есть в библиотеке', 'In your library')}</Link>}
               {best && <button className={libLink ? 'btn btn-g' : 'btn btn-w'} disabled={!!busy} onClick={() => add(best, 'stream')}>{busy === best.link + 'stream' ? <span className="spin" /> : <PlayGlyph />}{tr('Смотреть сразу', 'Watch now')}{best.quality ? ` · ${best.quality}` : ''}</button>}
               {best && <button className="btn btn-g" disabled={!!busy} onClick={() => add(best, 'download')}><Icon name="download" size={18} />{tr('Скачать', 'Download')}</button>}

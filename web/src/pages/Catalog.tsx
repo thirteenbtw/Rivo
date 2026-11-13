@@ -11,6 +11,7 @@ import { PeopleRow } from './Person';
 import { ContinueSection, useHomeData } from '../components/LibraryParts';
 import { Icon, PlayGlyph } from '../components/Icon';
 import { CardMarks } from '../components/Marks';
+import { MobileHead } from '../components/MobileNav';
 
 type Kind = 'movie' | 'tv';
 type Genre = { id: number; name: string };
@@ -58,6 +59,7 @@ export default function Catalog() {
   return (
     <main className="main">
       <h1 className="sr">{t('home')}</h1>
+      {browsing && <MobileHead />}
       {browsing && <Spotlight kind={kind} />}
       {browsing && genres.data && <GenreTiles kind={kind} genres={genres.data} onPick={(id) => set({ genre: id, list: '' })} />}
       {browsing && <ContinueSection items={home.data?.continue || []} />}

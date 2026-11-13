@@ -9,7 +9,7 @@ import { AppMark, Wordmark } from './Brand';
 // page — the mark and the wordmark, back and forward, where you are, the
 // search, and the two live switches (background, TV). It is part of the
 // shell, not of a page, so the search is the same keystroke away everywhere.
-export function TitleBar({ catalog, types }: { catalog: boolean; types: boolean }) {
+export function TitleBar({ catalog, types, home = false }: { catalog: boolean; types: boolean; home?: boolean }) {
   const nav = useNavigate();
   const loc = useLocation();
   const [params] = useSearchParams();
@@ -72,7 +72,7 @@ export function TitleBar({ catalog, types }: { catalog: boolean; types: boolean 
   };
 
   return (
-    <header className={'titlebar' + (scrolled ? ' on' : '')}>
+    <header className={'titlebar' + (scrolled ? ' on' : '') + (home ? ' tb-home' : '')}>
       <div className="tb-left">
         <Link to="/" className="tb-brand" aria-label="Rivo">
           <AppMark size={26} />

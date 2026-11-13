@@ -33,7 +33,7 @@ export function useHomeData() {
 }
 
 // localSlides turns featured library items into carousel slides.
-export function localSlides(items: Item[], openCast: (x: { fileId?: number; title: string }) => void): Slide[] {
+export function localSlides(items: Item[], openCast: (x: { fileId?: number; itemId?: number; title: string }) => void): Slide[] {
   return items.map((film) => {
     const fileId = film.files?.[0]?.id;
     const isNew = Date.now() / 1000 - film.addedAt < 7 * 86400;
@@ -47,7 +47,7 @@ export function localSlides(items: Item[], openCast: (x: { fileId?: number; titl
       </>,
       actions: <>
         {fileId && <Link className="btn btn-w" to={`/play/${fileId}?item=${film.id}`}><PlayGlyph />{film.progress && !film.progress.watched && film.progress.position > 30 ? t('continue') : t('watch')}</Link>}
-        {fileId && <button className="btn btn-g" onClick={() => openCast({ fileId, title: film.title })}><Icon name="cast" size={18} />{t('toTv')}</button>}
+        {fileId && <button className="btn btn-g" onClick={() => openCast({ fileId, itemId: film.id, title: film.title })}><Icon name="cast" size={18} />{t('toTv')}</button>}
         <Link className="btn btn-g" to={itemLink(film)} style={{ color: '#FFFFFF' }}>{t('details')}</Link>
       </>,
     };
@@ -58,7 +58,7 @@ export function ContinueSection({ items }: { items: Item[] }) {
   if (!items.length) return null;
   return (
     <Section id="cont" title={t('continueWatching')} note={t('syncNote')}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>
+      <div className="cont-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>
         {items.slice(0, 8).map((c) => {
           const p = c.progress!;
           const pct = p.duration ? p.position / p.duration : 0;

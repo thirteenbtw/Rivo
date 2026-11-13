@@ -11,6 +11,7 @@ import Player from './pages/Player';
 import Torrents from './pages/Torrents';
 import Lists from './pages/Lists';
 import Devices from './pages/Devices';
+import RemotePage from './pages/Remote';
 import Settings from './pages/Settings';
 import ProfilesPage from './pages/Profiles';
 import { Login, Setup } from './pages/Setup';
@@ -39,6 +40,8 @@ function Gate() {
         <Route path="lists" element={<Lists />} />
         <Route path="torrents" element={<Torrents />} />
         <Route path="devices" element={<Devices />} />
+        <Route path="remote" element={<RemotePage />} />
+        <Route path="remote/:id" element={<RemotePage />} />
         <Route path="settings" element={<Settings />} />
         <Route path="profiles" element={<ProfilesPage />} />
         <Route path="*" element={<main className="main pad"><h1 className="h1">{tr('Страница не найдена', 'Page not found')}</h1></main>} />

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rivo</title>
+<link rel="icon" href="/favicon.svg">
+<!--
+  Rivo lite: the TV interface for old TV engines (LG webOS 3-4, Tizen 2-4,
+  Chromium 38-53) that can't run the main interface. web/index.html sends
+  them here. Library, "Continue", the player and the remote from the phone;
+  the catalog and torrents stay on the phone. Plain ES5 and old CSS only:
+  no CSS variables, flex gap or grid (see lite.js for the script rules).
+-->
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:#141A33;color:#E7ECF7;font:400 22px/1.35 'Inter','LG Smart UI','Samsung One',sans-serif}
+  #app{position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden;-webkit-transform-origin:0 0;transform-origin:0 0}
+  .page{position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden}
+  .scroll{position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden}
+  .hide{display:none!important}
+
+  /* header */
+  .head{height:96px;padding:30px 64px 0;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center}
+  .logo{font:900 40px/1 'Inter',sans-serif;letter-spacing:-.02em;color:#fff}
+  .logo i{font-style:normal;position:relative}
+  .logo i:after{content:"";position:absolute;left:50%;top:.2em;width:.15em;height:.15em;margin-left:-.075em;background:#8EDCC8;-webkit-transform:rotate(45deg);transform:rotate(45deg)}
+  .head .sp{-webkit-flex:1;flex:1}
+  .head .who{color:#9AA3C7;font-size:20px;margin-right:24px}
+  .head .clock{font-weight:700;font-size:24px;color:#fff}
+
+  /* rows of cards */
+  .sec{padding:0 64px;margin-top:22px}
+  .sec h2{font:800 26px/1.2 'Inter Tight','Inter',sans-serif;color:#fff;margin-bottom:14px}
+  .row{white-space:nowrap;overflow:hidden;height:330px;margin:0 -64px;padding:6px 64px 0}
+  .row.wide{height:250px}
+  .row .in{white-space:nowrap}
+  .card{display:inline-block;vertical-align:top;width:190px;margin-right:22px;white-space:normal;border-radius:16px;outline:none;cursor:pointer}
+  .card .pic{position:relative;width:190px;height:285px;border-radius:14px;overflow:hidden;background:#252D51 center/cover no-repeat;border:3px solid transparent}
+  .card .t{margin-top:8px;font-size:18px;color:#C3C8E0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card.w{width:340px}
+  .card.w .pic{width:340px;height:191px}
+  .card .bar{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(0,0,0,.45)}
+  .card .bar b{display:block;height:6px;background:#3FB79C}
+  .card .noimg{position:absolute;left:0;right:0;top:40%;text-align:center;padding:0 14px;font-weight:800;color:#A5B4FC}
+  .card.on .pic{border-color:#fff;-webkit-transform:scale(1.04);transform:scale(1.04)}
+  .card.on .t{color:#fff}
+  .empty{padding:40px 64px;color:#9AA3C7}
+
+  /* title page */
+  .bd{position:absolute;left:0;top:0;width:1280px;height:720px;background:#141A33 center/cover no-repeat}
+  .bd:after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;background:-webkit-linear-gradient(left,#141A33 30%,rgba(20,26,51,.75) 60%,rgba(20,26,51,.2));background:linear-gradient(90deg,#141A33 30%,rgba(20,26,51,.75) 60%,rgba(20,26,51,.2))}
+  .info{position:relative;padding:110px 64px 0;width:760px}
+  .info h1{font:800 54px/1.05 'Inter Tight','Inter',sans-serif;color:#fff;letter-spacing:-.01em}
+  .meta{margin-top:14px;color:#A5B4FC;font-size:20px}
+  .ov{margin-top:16px;color:#C3C8E0;font-size:20px;max-height:136px;overflow:hidden}
+  .acts{margin-top:28px;white-space:nowrap}
+  .btn{display:inline-block;height:60px;line-height:56px;padding:0 30px;margin-right:14px;border-radius:30px;border:2px solid #353E68;background:#252D51;color:#E7ECF7;font-weight:700;font-size:21px;outline:none;cursor:pointer}
+  .btn.main{background:#5B6EE1;border-color:#5B6EE1;color:#fff}
+  .btn.on{background:#fff;border-color:#fff;color:#141A33}
+  .seasons{position:relative;padding:0 64px;margin-top:28px;white-space:nowrap}
+  .seasons .btn{height:48px;line-height:44px;padding:0 22px;font-size:19px}
+  .seasons .btn.sel{border-color:#A5B4FC}
+  .eps{position:relative;margin:18px 64px 0;height:300px;overflow:hidden}
+  .ep{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;height:76px;padding:0 20px;margin-bottom:8px;border-radius:14px;background:rgba(37,45,81,.7);border:2px solid transparent;outline:none;cursor:pointer;width:760px}
+  .ep .n{width:56px;font-weight:800;color:#A5B4FC}
+  .ep .et{-webkit-flex:1;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#E7ECF7}
+  .ep .st{margin-left:16px;color:#9AA3C7;font-size:18px}
+  .ep .st.done{color:#3FB79C}
+  .ep.on{background:#fff;border-color:#fff}
+  .ep.on .et,.ep.on .n{color:#141A33}
+  .ep.on .st{color:#5B6EE1}
+
+  /* player */
+  #player{background:#000}
+  #video{position:absolute;left:0;top:0;width:1280px;height:720px;background:#000}
+  .subs{position:absolute;left:80px;right:80px;bottom:70px;text-align:center;font-size:34px;line-height:1.3;color:#fff;text-shadow:0 0 6px #000,0 2px 3px #000,0 0 2px #000;white-space:pre-line}
+  #player.ui .subs{bottom:200px}
+  .osd{position:absolute;left:0;right:0;bottom:0;padding:120px 64px 40px;background:-webkit-linear-gradient(top,rgba(0,0,0,0),rgba(0,0,0,.85));background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.85));opacity:0;-webkit-transition:opacity .25s;transition:opacity .25s}
+  #player.ui .osd{opacity:1}
+  .osd .pt{font:800 32px/1.2 'Inter Tight','Inter',sans-serif;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .osd .pi{color:#C3C8E0;font-size:19px;margin-top:4px}
+  .track{position:relative;height:8px;border-radius:4px;background:rgba(255,255,255,.25);margin-top:22px}
+  .track b{position:absolute;left:0;top:0;height:8px;border-radius:4px;background:#8EDCC8}
+  .track i{position:absolute;top:-7px;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:#fff}
+  .times{display:-webkit-flex;display:flex;margin-top:12px;color:#E7ECF7;font-size:20px}
+  .times .sp{-webkit-flex:1;flex:1;text-align:center;color:#9AA3C7;font-size:18px}
+  .big{position:absolute;left:50%;top:50%;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;background:rgba(20,26,51,.75);color:#fff;font-size:46px;line-height:120px;text-align:center}
+  .spin{position:absolute;left:50%;top:50%;width:72px;height:72px;margin:-36px 0 0 -36px;border-radius:50%;border:6px solid rgba(255,255,255,.2);border-top-color:#8EDCC8;-webkit-animation:sp 1s linear infinite;animation:sp 1s linear infinite}
+  @-webkit-keyframes sp{to{-webkit-transform:rotate(360deg)}}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .err{position:absolute;left:160px;right:160px;top:280px;padding:28px;border-radius:20px;background:#252D51;color:#fff;text-align:center;font-size:22px}
+  .panel{position:absolute;right:48px;top:48px;max-height:624px;width:470px;padding:26px;border-radius:24px;background:rgba(20,26,51,.96);overflow:hidden}
+  .panel h3{font-size:18px;color:#9AA3C7;font-weight:700;margin:6px 0 10px;text-transform:uppercase;letter-spacing:.06em}
+  .opt{height:56px;line-height:52px;padding:0 20px;margin-bottom:6px;border-radius:14px;border:2px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;outline:none;cursor:pointer;color:#E7ECF7}
+  .opt.sel:before{content:"● ";color:#8EDCC8}
+  .opt.on{background:#fff;color:#141A33}
+  .next{position:absolute;right:64px;bottom:200px;padding:18px 26px;border-radius:18px;background:rgba(20,26,51,.92);color:#fff;font-size:20px}
+
+  .toast{position:absolute;left:50%;top:40px;width:640px;margin-left:-320px;padding:16px 24px;border-radius:16px;background:#252D51;border:2px solid #353E68;color:#fff;text-align:center;font-size:20px}
+  .hint{position:absolute;left:64px;bottom:26px;color:#6E78A8;font-size:17px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="page" id="home">
+    <div class="scroll" id="homeScroll">
+      <div class="head"><div class="logo">r<i>ı</i>vo</div><div class="sp"></div><div class="who" id="who"></div><div class="clock" id="clock"></div></div>
+      <div id="rows"><div class="empty">Загружаем библиотеку…</div></div>
+      <div style="height:60px"></div>
+    </div>
+  </div>
+  <div class="page hide" id="title">
+    <div class="bd" id="tBd"></div>
+    <div class="scroll" id="titleScroll">
+      <div class="info">
+        <h1 id="tName"></h1>
+        <div class="meta" id="tMeta"></div>
+        <div class="ov" id="tOv"></div>
+        <div class="acts" id="tActs"></div>
+      </div>
+      <div class="seasons" id="tSeasons"></div>
+      <div class="eps" id="tEps"><div class="in" id="tEpsIn"></div></div>
+    </div>
+  </div>
+  <div class="page hide" id="player">
+    <video id="video" preload="auto"></video>
+    <div class="subs" id="subs"></div>
+    <div class="spin hide" id="spin"></div>
+    <div class="big hide" id="big">❚❚</div>
+    <div class="osd">
+      <div class="pt" id="pTitle"></div>
+      <div class="pi" id="pInfo"></div>
+      <div class="track"><b id="pBar"></b><i id="pKnob"></i></div>
+      <div class="times"><span id="pCur">0:00</span><span class="sp">◀ ▶ перемотка · OK пауза · ▲ звук и субтитры</span><span id="pDur">0:00</span></div>
+    </div>
+    <div class="next hide" id="pNext"></div>
+    <div class="err hide" id="pErr"></div>
+    <div class="panel hide" id="panel"></div>
+  </div>
+  <div class="toast hide" id="toast"></div>
+</div>
+<script src="/lite.js"></script>
+</body>
+</html>

@@ -86,7 +86,7 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
 
   return (
     <main className="main" style={{ gap: 28 }}>
-      <section className="hero"
+      <section className="hero title-hero"
         style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: sky, minHeight: 'clamp(380px, 34vw, 540px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 40px 36px', color: '#FFFFFF', boxShadow: '0 20px 50px var(--sh)' }}>
         {backdrop ? (
           <Backdrop src={backdrop} />
@@ -118,12 +118,12 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
               {fmtTime(prog.position)} {tr('из', 'of')} {fmtTime(prog.duration)}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
+          <div className="th-act" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
             {file && target && <Link className="btn btn-w" to={playUrl(file.id, target.id)}><PlayGlyph />{resume ? t('continue') : t('watch')}{kind === 'show' && target.season ? ` ${tr('С', 'S')}${target.season}·${tr('Э', 'E')}${target.episode}` : ''}</Link>}
-            {file && <button className="btn btn-g" onClick={() => openCast({ fileId: file.id, start: resume, title, audio, sub })}><Icon name="cast" size={18} />{t('toTv')}</button>}
+            {file && <button className="btn btn-g" onClick={() => openCast({ fileId: file.id, itemId: target?.id, start: resume, title, audio, sub })}><Icon name="cast" size={18} />{t('toTv')}</button>}
             <button className="btn btn-g" aria-pressed={later} onClick={() => toggleList('later', !later)}><Icon name={later ? 'check' : 'plus'} size={18} />{later ? t('inListOn') : t('inList')}</button>
             <button className="btn btn-g" aria-label={t('addFav')} aria-pressed={fav} onClick={() => toggleList('favorites', !fav)} style={{ width: 44, padding: 0, background: fav ? 'var(--acc)' : undefined }}><Icon name="heart" size={18} /></button>
-            <button className="btn btn-g" aria-label={t('markWatched')} aria-pressed={isWatched} onClick={markWatched} style={{ width: 44, padding: 0, background: isWatched ? '#2F9E62' : undefined }}><Icon name="check" size={18} /></button>
+            <button className="btn btn-g" aria-label={t('markWatched')} aria-pressed={isWatched} onClick={markWatched} style={{ width: 44, padding: 0, background: isWatched ? 'var(--prog)' : undefined }}><Icon name="check" size={18} /></button>
           </div>
         </div>
       </section>
@@ -152,7 +152,7 @@ function Detail({ kind, item, show, nextUp, similar = [], compat = [], reload }:
                         <div className="sub" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginTop: 4 }}>{e.overview || [e.quality, e.runtime ? fmtRuntime(e.runtime) : ''].filter(Boolean).join(' · ')}</div>
                       </div>
                       {ef && <Link className="btn btn-l sm" to={`/play/${ef.id}?item=${e.id}${p && !p.watched && p.position > 30 ? '&start=' + Math.floor(p.position) : ''}`} aria-label={`${t('watch')} ${e.episode}`}><PlayGlyph size={14} /></Link>}
-                      {ef && <button className="btn btn-l sm" aria-label={`${t('toTv')} ${e.episode}`} onClick={() => openCast({ fileId: ef.id, title: `${title} · ${tr('С', 'S')}${e.season}${tr('Э', 'E')}${e.episode}`, start: p && !p.watched ? p.position : 0 })}><Icon name="cast" size={16} /></button>}
+                      {ef && <button className="btn btn-l sm" aria-label={`${t('toTv')} ${e.episode}`} onClick={() => openCast({ fileId: ef.id, itemId: e.id, title: `${title} · ${tr('С', 'S')}${e.season}${tr('Э', 'E')}${e.episode}`, start: p && !p.watched ? p.position : 0 })}><Icon name="cast" size={16} /></button>}
                     </div>
                   );
                 })}

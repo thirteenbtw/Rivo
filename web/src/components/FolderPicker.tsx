@@ -17,6 +17,14 @@ export function FolderPicker({ title, initial, onPick, onClose }: { title: strin
     setErr(null);
     api.get<Listing>(`/api/fs?path=${encodeURIComponent(path)}`).then((l) => { setList(l); setTyped(l.path); }).catch((e) => setErr(e.message));
   }, [path]);
+  // A path typed into the field wins over the listed folder: check it opens,
+  // then use it (pressing "Use" without "Open" first used to drop it).
+  const choose = () => {
+    const t = typed.trim();
+    if (!t || t === list?.path) { if (list?.path) onPick(list.path); return; }
+    setErr(null);
+    api.get<Listing>(`/api/fs?path=${encodeURIComponent(t)}`).then((l) => onPick(l.path)).catch((e) => setErr(e.message));
+  };
   return (
     <Modal title={title} onClose={onClose}>
       <form className="row" onSubmit={(e) => { e.preventDefault(); setPath(typed); }}>
@@ -32,7 +40,7 @@ export function FolderPicker({ title, initial, onPick, onClose }: { title: strin
         {list && list.dirs.length === 0 && <div className="sub" style={{ padding: 10 }}>{tr('Вложенных папок нет', 'No subfolders')}</div>}
       </div>
       <div className="row">
-        <button className="btn btn-d sm" disabled={!list?.path} onClick={() => list?.path && onPick(list.path)}>{tr('Выбрать эту папку', 'Use this folder')}</button>
+        <button className="btn btn-d sm" disabled={!list?.path && !typed.trim()} onClick={choose}>{tr('Выбрать эту папку', 'Use this folder')}</button>
         <span className="mono sub" style={{ wordBreak: 'break-all' }}>{list?.path}</span>
       </div>
     </Modal>

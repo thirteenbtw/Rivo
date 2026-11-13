@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/wlynxg/anet"
 	"golang.org/x/net/ipv4"
 
 	"github.com/thirteenbtw/homecinema/server/internal/store"
@@ -24,7 +25,7 @@ var mdnsGroup = &net.UDPAddr{IP: net.IPv4(224, 0, 0, 251), Port: 5353}
 // finds TVs even when inbound mDNS is blocked for the server, or when another
 // program holds port 5353.
 func probeCastUnicast(ctx context.Context) []store.Device {
-	ifaces, err := net.Interfaces()
+	ifaces, err := anet.Interfaces()
 	if err != nil {
 		return nil
 	}
@@ -55,7 +56,7 @@ func probeCastUnicast(ctx context.Context) []store.Device {
 }
 
 func ifaceIPv4(ifi net.Interface) net.IP {
-	addrs, _ := ifi.Addrs()
+	addrs, _ := anet.InterfaceAddrsByInterface(&ifi)
 	for _, a := range addrs {
 		if n, ok := a.(*net.IPNet); ok {
 			if ip4 := n.IP.To4(); ip4 != nil && !ip4.IsLinkLocalUnicast() {

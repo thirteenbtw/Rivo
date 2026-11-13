@@ -104,6 +104,7 @@ type HWInfo struct {
 
 var hwEncoders = []struct{ key, encoder string }{
 	{"nvenc", "h264_nvenc"}, {"qsv", "h264_qsv"}, {"amf", "h264_amf"}, {"vaapi", "h264_vaapi"},
+	{"mediacodec", "h264_mediacodec"}, // Android: the phone's hardware encoder
 }
 
 func (m *Manager) HW() *HWInfo {
@@ -152,7 +153,7 @@ func (m *Manager) detect() *HWInfo {
 func (m *Manager) run(timeout time.Duration, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
+	cmd := probe.Command(ctx, m.FFmpeg, args...)
 	probe.HideWindow(cmd)
 	return cmd.CombinedOutput()
 }
@@ -213,7 +214,7 @@ func (m *Manager) Start(o Options) (*Session, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{ID: id, Dir: dir, Opts: o, cancel: cancel, started: time.Now(), lastSeen: time.Now(), done: make(chan struct{})}
 	args := m.buildArgs(o, dir)
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
+	cmd := probe.Command(ctx, m.FFmpeg, args...)
 	probe.HideWindow(cmd)
 	stderr, _ := cmd.StderrPipe()
 	if err := cmd.Start(); err != nil {
@@ -352,10 +353,15 @@ func (m *Manager) buildArgs(o Options, dir string) []string {
 			args = append(args, "-c:v", "h264_amf", "-quality", "speed", "-b:v", bitrate, "-maxrate", bitrate)
 		case "vaapi":
 			args = append(args, "-c:v", "h264_vaapi", "-b:v", bitrate, "-maxrate", bitrate)
+		case "mediacodec":
+			args = append(args, "-c:v", "h264_mediacodec", "-b:v", bitrate)
 		default:
 			args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", bitrate, "-bufsize", "2M")
 		}
-		args = append(args, "-profile:v", "high", "-g", "96", "-keyint_min", "96", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)")
+		if enc != "mediacodec" {
+			args = append(args, "-profile:v", "high")
+		}
+		args = append(args, "-g", "96", "-keyint_min", "96", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)")
 	}
 	if o.CopyAudio {
 		args = append(args, "-c:a", "copy")
@@ -645,7 +651,7 @@ func (m *Manager) Subtitle(ctx context.Context, input string, t store.Track, off
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, m.FFmpeg, args...)
+	cmd := probe.Command(ctx, m.FFmpeg, args...)
 	probe.HideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(dst)

@@ -28,7 +28,10 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) error {
 		urls = append(urls, "http://"+ip+":"+itoa(s.Port))
 	}
 	authed := s.authorized(r)
+	host, _ := os.Hostname()
 	out := map[string]any{
+		"app":          "rivo",
+		"host":         host,
 		"version":      s.Version,
 		"setupDone":    s.Store.Setting("setupDone", "") == "1",
 		"authRequired": !authed,
