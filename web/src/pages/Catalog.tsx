@@ -5,7 +5,6 @@ import { useAsync } from '../state';
 import { t, tr } from '../i18n';
 import { Art } from '../components/Art';
 import { Section } from '../components/Shell';
-import { TopBar } from '../components/TopBar';
 import { Featured, Badge } from '../components/Featured';
 import { previewProps } from '../components/Preview';
 import { PeopleRow } from './Person';
@@ -61,7 +60,6 @@ export default function Catalog() {
     <main className="main">
       <h1 className="sr">{t('home')}</h1>
       {browsing && <MobileHead />}
-      <TopBar catalog home={browsing} />
       {browsing && <Spotlight kind={kind} />}
       {browsing && genres.data && <GenreTiles kind={kind} genres={genres.data} onPick={(id) => set({ genre: id, list: '' })} />}
       {browsing && <ContinueSection items={home.data?.continue || []} />}

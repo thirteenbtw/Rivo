@@ -6,7 +6,6 @@ import { getLang, t, tr } from '../i18n';
 import { Backdrop } from '../components/Art';
 import { Icon } from '../components/Icon';
 import { Section } from '../components/Shell';
-import { TopBar } from '../components/TopBar';
 import { previewProps } from '../components/Preview';
 import { CatalogCard } from './Catalog';
 
@@ -59,7 +58,6 @@ export default function PersonPage() {
   const { data, error } = useAsync(() => api.get<Person>(`/api/catalog/person/${id}`), [id]);
   return (
     <main className="main">
-      <TopBar catalog />
       {error && <div className="empty">{error}</div>}
       {!data && !error && <div className="loading"><span className="spin lg" /></div>}
       {data && <Detail key={data.id} p={data} />}
@@ -236,7 +234,6 @@ export function PersonFind() {
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <main className="main">
-      <TopBar catalog />
       {miss ? <div className="empty">{tr(`Не нашли «${name}» в TMDB`, `“${name}” was not found on TMDB`)}</div> : <div className="loading"><span className="spin lg" /></div>}
     </main>
   );
@@ -273,7 +270,6 @@ export function PeoplePage() {
   useEffect(() => load(1), []);
   return (
     <main className="main">
-      <TopBar catalog />
       <Section title={tr('Популярные люди', 'Popular people')} note={tr('Наведите — фото станет цветным', 'Hover to colorize')}>
         {err && <div className="empty">{err}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 16 }}>

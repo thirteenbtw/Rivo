@@ -112,7 +112,7 @@ export function focusFirst(scope: ParentNode = scopeRoot()): boolean {
   const vh = window.innerHeight;
   const all = candidates(main);
   // Past the header: the hero's Play button or the first poster, not "Back".
-  const body = all.filter(([el]) => !el.closest('.topbar'));
+  const body = all.filter(([el]) => !el.closest('.topbar,.titlebar'));
   const pool = body.length ? body : all;
   const list = pool.filter(([, r]) => r.bottom > 0 && r.top < vh);
   const pick = (list.length ? list : pool).sort(([, a], [, b]) => (a.top - b.top) || (a.left - b.left))[0];
@@ -133,7 +133,7 @@ export function focusPage() {
     if (a && a !== document.body) return;
     if (document.querySelector('.player')) return;
     const vh = window.innerHeight;
-    const main = candidates(document.querySelector('main') || document).filter(([el, r]) => !el.closest('.topbar') && r.bottom > 0 && r.top < vh);
+    const main = candidates(document.querySelector('main') || document).filter(([el, r]) => !el.closest('.topbar,.titlebar') && r.bottom > 0 && r.top < vh);
     const primary = main.find(([el]) => el.matches('[data-tv-first],.btn-w,.btn-d'));
     if (primary) { focusEl(primary[0]); return; }
     if (++tries < 10) { pageTimer = window.setTimeout(tick, 300); return; }

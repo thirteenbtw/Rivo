@@ -3,9 +3,9 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useApp } from '../state';
 import { t, tr } from '../i18n';
 import { Icon } from './Icon';
-import { AppMark } from './Brand';
 import { CastDialog } from './CastDialog';
 import { MobileNav } from './MobileNav';
+import { TitleBar } from './TitleBar';
 import { Dots } from './Dots';
 import { PreviewLayer } from './Preview';
 import { installDragScroll } from './dragScroll';
@@ -53,6 +53,14 @@ export function Shell() {
   }, [state?.askProfile]);
 
   const active = torrents?.items.filter((x) => ['downloading', 'streaming', 'meta'].includes(x.status)).length || 0;
+  // Where the search looks: Home and the people pages search the whole catalog,
+  // every other page searches the library. The type switch belongs to both of
+  // those; on a library page the page itself already decides what it shows.
+  const catalog = loc.pathname === '/' || loc.pathname === '/people' || loc.pathname.startsWith('/person');
+  const types = catalog || loc.pathname === '/search';
+  // Home as a shelf, not a search or a filtered list: on a phone the bar there
+  // shows only the type switch (the search is a tab of its own).
+  const home = loc.pathname === '/' && !['search', 'q', 'genre', 'list', 'sort'].some((k) => new URLSearchParams(loc.search).has(k));
   const theme = prefs.theme;
   // The page scrollbar belongs to <html>, so it needs the theme tokens too.
   useEffect(() => {
@@ -66,34 +74,34 @@ export function Shell() {
     <AmbientCtx.Provider value={setColors}>
       <div className={`app th-${theme} ac-${prefs.accent}${prefs.calm ? ' calm' : ''}`}>
         {bgOn && <Dots intensity={prefs.intensity} />}
-        <nav className="rail" aria-label={tr('Разделы', 'Sections')} style={{ flex: '0 0 64px', padding: '16px 10px', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'sticky', top: 0, height: 'var(--vh)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', zIndex: 2 }}>
-          <Link to="/" aria-label="Rivo" className="nav-extra" style={{ display: 'grid', marginBottom: 16 }}>
-            <AppMark size={34} />
-          </Link>
-          <Nav to="/" icon="home" label={t('home')} end />
-          <Nav to="/library/movies" icon="film" label={t('movies')} />
-          <Nav to="/library/shows" icon="tv" label={t('shows')} />
-          <div aria-hidden="true" className="nav-extra" style={{ width: 24, height: 1, background: 'var(--line)', margin: '8px 0' }} />
-          <Nav to="/torrents" icon="download" label={active ? `${t('torrents')}, ${active} ${tr('активных', 'active')}` : t('torrents')} dot={active > 0} />
-          <Nav to="/devices" icon="cast" label={t('devices')} />
-          <Nav to="/remote" icon="remote" label={tr('Пульт', 'Remote')} />
-          <Nav to="/lists" icon="heart" label={tr('Мои списки', 'My lists')} extra />
-          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }} className="nav-bottom">
-            <button className="ri nav-extra" onClick={() => setPrefs({ theme: themeOrder[(themeOrder.indexOf(theme) + 1) % 3] })}
-              aria-label={`${t('theme')}: ${themeLabels[theme]}. ${tr('Переключить', 'Switch')}`} title={`${t('theme')}: ${themeLabels[theme]}`}>
-              <Icon name="theme" />
-            </button>
-            <Nav to="/settings" icon="sliders" label={t('settings')} />
-            <Link to="/profiles" aria-label={`${t('profile')}: ${profile?.name || ''}`} className="nav-extra"
-              style={{ width: 32, height: 32, borderRadius: '50%', background: profile?.color || 'var(--acc)', color: '#FFFFFF', font: "700 calc(13px * var(--fs)) 'Inter',sans-serif", display: 'grid', placeItems: 'center' }}>
-              {(profile?.name || '?').slice(0, 1).toUpperCase()}
-            </Link>
-          </div>
-        </nav>
-        <PageBoundary key={loc.pathname}><Outlet /></PageBoundary>
-        <MobileNav />
-        <CastDialog />
-        <PreviewLayer />
+        <TitleBar catalog={catalog} types={types} home={home} />
+        <div className="cols">
+          <nav className="rail" aria-label={tr('Разделы', 'Sections')} style={{ flex: '0 0 64px', padding: '8px 10px 16px', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'sticky', top: 'var(--tb)', height: 'calc(var(--vh) - var(--tb))', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', zIndex: 2 }}>
+            <Nav to="/" icon="home" label={t('home')} end />
+            <Nav to="/library/movies" icon="film" label={t('movies')} />
+            <Nav to="/library/shows" icon="tv" label={t('shows')} />
+            <div aria-hidden="true" className="nav-extra" style={{ width: 24, height: 1, background: 'var(--line)', margin: '8px 0' }} />
+            <Nav to="/torrents" icon="download" label={active ? `${t('torrents')}, ${active} ${tr('активных', 'active')}` : t('torrents')} dot={active > 0} />
+            <Nav to="/devices" icon="cast" label={t('devices')} />
+            <Nav to="/remote" icon="remote" label={tr('Пульт', 'Remote')} />
+            <Nav to="/lists" icon="heart" label={tr('Мои списки', 'My lists')} extra />
+            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }} className="nav-bottom">
+              <button className="ri nav-extra" onClick={() => setPrefs({ theme: themeOrder[(themeOrder.indexOf(theme) + 1) % 3] })}
+                aria-label={`${t('theme')}: ${themeLabels[theme]}. ${tr('Переключить', 'Switch')}`} title={`${t('theme')}: ${themeLabels[theme]}`}>
+                <Icon name="theme" />
+              </button>
+              <Nav to="/settings" icon="sliders" label={t('settings')} />
+              <Link to="/profiles" aria-label={`${t('profile')}: ${profile?.name || ''}`} className="nav-extra"
+                style={{ width: 32, height: 32, borderRadius: '50%', background: profile?.color || 'var(--acc)', color: '#FFFFFF', font: "700 calc(13px * var(--fs)) 'Inter',sans-serif", display: 'grid', placeItems: 'center' }}>
+                {(profile?.name || '?').slice(0, 1).toUpperCase()}
+              </Link>
+            </div>
+          </nav>
+          <PageBoundary key={loc.pathname}><Outlet /></PageBoundary>
+          <MobileNav />
+          <CastDialog />
+          <PreviewLayer />
+        </div>
       </div>
     </AmbientCtx.Provider>
   );
