@@ -58,7 +58,7 @@ export function ContinueSection({ items }: { items: Item[] }) {
   if (!items.length) return null;
   return (
     <Section id="cont" title={t('continueWatching')} note={t('syncNote')}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>
+      <div className="cont-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>
         {items.slice(0, 8).map((c) => {
           const p = c.progress!;
           const pct = p.duration ? p.position / p.duration : 0;

@@ -5,6 +5,7 @@ import { t, tr } from '../i18n';
 import { Icon } from './Icon';
 import { AppMark } from './Brand';
 import { CastDialog } from './CastDialog';
+import { MobileNav } from './MobileNav';
 import { Dots } from './Dots';
 import { PreviewLayer } from './Preview';
 import { installDragScroll } from './dragScroll';
@@ -65,7 +66,7 @@ export function Shell() {
     <AmbientCtx.Provider value={setColors}>
       <div className={`app th-${theme} ac-${prefs.accent}${prefs.calm ? ' calm' : ''}`}>
         {bgOn && <Dots intensity={prefs.intensity} />}
-        <nav aria-label={tr('Разделы', 'Sections')} style={{ flex: '0 0 64px', padding: '16px 10px', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'sticky', top: 0, height: 'var(--vh)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', zIndex: 2 }}>
+        <nav className="rail" aria-label={tr('Разделы', 'Sections')} style={{ flex: '0 0 64px', padding: '16px 10px', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'sticky', top: 0, height: 'var(--vh)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none', zIndex: 2 }}>
           <Link to="/" aria-label="Rivo" className="nav-extra" style={{ display: 'grid', marginBottom: 16 }}>
             <AppMark size={34} />
           </Link>
@@ -90,6 +91,7 @@ export function Shell() {
           </div>
         </nav>
         <PageBoundary key={loc.pathname}><Outlet /></PageBoundary>
+        <MobileNav />
         <CastDialog />
         <PreviewLayer />
       </div>

@@ -11,25 +11,29 @@
   (web/src/tv.ts). Packaged by tv/package.sh.
 -->
 <style>
-  :root{--night:#141A33;--card:#252D51;--line:#353E68;--ice:#E7ECF7;--mut:#9AA3C7;--iris:#5B6EE1;--lav:#A5B4FC;--mint:#8EDCC8}
+  /* plain colors and margins, no CSS variables or flex gap: older webOS and
+     Tizen engines (Chromium 38-53) ignore them */
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--night);color:var(--ice);font:400 22px/1.4 'Inter','Samsung One',sans-serif}
-  body{display:flex;align-items:center;justify-content:center}
-  .wrap{width:760px;max-width:92vw;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+  html,body{margin:0;height:100%;background:#141A33;color:#E7ECF7;font:400 22px/1.4 'Inter','Samsung One',sans-serif}
+  body{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center}
+  .wrap{width:760px;max-width:92vw;text-align:center}
+  .wrap>*{margin:0 auto 14px}
   .logo{font:900 76px/1 'Inter',sans-serif;letter-spacing:-.02em}
   .logo i{font-style:normal;position:relative}
-  .logo i::after{content:"";position:absolute;left:50%;top:.2em;width:.15em;height:.15em;margin-left:-.075em;background:var(--mint);transform:rotate(45deg)}
+  .logo i::after{content:"";position:absolute;left:50%;top:.2em;width:.15em;height:.15em;margin-left:-.075em;background:#8EDCC8;transform:rotate(45deg)}
   h1{margin:8px 0 0;font-size:34px}
-  .sub{color:var(--mut);max-width:640px}
-  .status{color:var(--lav);min-height:1.4em;margin-top:10px}
-  .list{width:560px;max-width:100%;display:flex;flex-direction:column;gap:10px}
-  button,input{font:inherit;color:var(--ice);border-radius:16px;border:2px solid var(--line);background:var(--card);height:64px;padding:0 24px}
+  .sub{color:#9AA3C7;max-width:640px}
+  .status{color:#A5B4FC;min-height:1.4em;margin-top:10px}
+  .list{width:560px;max-width:100%}
+  .list button{display:block;width:100%;margin-bottom:10px}
+  button,input{font:inherit;color:#E7ECF7;border-radius:16px;border:2px solid #353E68;background:#252D51;height:64px;padding:0 24px}
   button{cursor:pointer}
-  button:focus,input:focus{outline:none;background:var(--iris);border-color:#fff}
-  input:focus{background:var(--card);border-color:var(--iris)}
-  .row{display:flex;gap:10px;width:560px;max-width:100%}
-  .row input{flex:1;min-width:0}
-  .hint{color:var(--mut);font-size:18px;margin-top:16px}
+  button:focus,input:focus{outline:none;background:#5B6EE1;border-color:#fff}
+  input:focus{background:#252D51;border-color:#5B6EE1}
+  .row{display:-webkit-flex;display:flex;width:560px;max-width:100%}
+  .row button{margin-left:10px}
+  .row input{-webkit-flex:1;flex:1;min-width:0}
+  .hint{color:#9AA3C7;font-size:18px;margin-top:16px}
 </style>
 </head>
 <body>
@@ -69,11 +73,22 @@
   // request can't read it, but reaching it is enough to offer the address.
   function ping(url, ms) {
     return new Promise(function (ok) {
-      var done = false, ctl = window.AbortController ? new AbortController() : null;
-      var t = setTimeout(function () { if (!done) { done = true; if (ctl) ctl.abort(); ok(false); } }, ms);
-      fetch(url + '/api/state', { mode: 'no-cors', cache: 'no-store', signal: ctl ? ctl.signal : undefined })
-        .then(function () { if (!done) { done = true; clearTimeout(t); ok(true); } })
-        .catch(function () { if (!done) { done = true; clearTimeout(t); ok(false); } });
+      var done = false;
+      var end = function (v) { if (!done) { done = true; ok(v); } };
+      // fetch in no-cors mode where there is one; older TV engines lack it,
+      // and an XMLHttpRequest can't reach another origin without CORS, so
+      // there the probe loads Rivo's icon as an image instead.
+      setTimeout(function () { end(false); }, ms);
+      try {
+        if (window.fetch) {
+          fetch(url + '/api/state', { mode: 'no-cors', cache: 'no-store' }).then(function () { end(true); }, function () { end(false); });
+        } else {
+          var img = new Image();
+          img.onload = function () { end(true); };
+          img.onerror = function () { end(false); };
+          img.src = url + '/favicon.svg?t=' + Date.now();
+        }
+      } catch (e) { end(false); }
     });
   }
 
@@ -151,15 +166,19 @@
   $('go').onclick = manual;
   $('again').onclick = scan;
   $('addr').addEventListener('keydown', function (e) { if (e.keyCode === 13) manual(); });
+  // The LG Magic Remote pointer takes focus away; the first arrow press brings it back.
+  window.addEventListener('focus', function () { if (!document.activeElement || document.activeElement === document.body) $('again').focus(); });
 
   // Arrow keys walk the controls top to bottom; Back leaves the app.
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
     if (k === 10009 || k === 461 || (k === 8 && document.activeElement !== $('addr'))) { e.preventDefault(); exit(); return; }
-    if (k !== 38 && k !== 40) return;
+    if (k < 37 || k > 40) return;
+    // In the text field Left/Right move the caret.
+    if ((k === 37 || k === 39) && document.activeElement === $('addr')) return;
     var all = Array.prototype.slice.call(document.querySelectorAll('button,input'));
     var at = all.indexOf(document.activeElement);
-    var to = all[Math.max(0, Math.min(all.length - 1, at + (k === 40 ? 1 : -1)))];
+    var to = all[Math.max(0, Math.min(all.length - 1, at + (k === 40 || k === 39 ? 1 : -1)))];
     if (to) { e.preventDefault(); to.focus(); }
   });
 
