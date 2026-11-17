@@ -13,7 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
+	"github.com/thirteenbtw/homecinema/server/internal/parse"
 	"github.com/thirteenbtw/homecinema/server/internal/store"
 	"github.com/thirteenbtw/homecinema/server/internal/torrent"
 )
@@ -27,7 +29,7 @@ func (s *Server) addTorrent(w http.ResponseWriter, r *http.Request) error {
 	if !s.Torrents.Settings().AcceptedRisk {
 		return httpError{http.StatusPreconditionRequired, "подтвердите предупреждение об ответственности за контент"}
 	}
-	var source, mode, link string
+	var source, mode, link, title string
 	var file []byte
 	keep := s.Torrents.Settings().KeepWatched
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
@@ -39,6 +41,7 @@ func (s *Server) addTorrent(w http.ResponseWriter, r *http.Request) error {
 			keep = v != "0"
 		}
 		source = r.FormValue("magnet")
+		title = strings.TrimSpace(r.FormValue("title"))
 		if fh, _, err := r.FormFile("file"); err == nil {
 			file, _ = io.ReadAll(io.LimitReader(fh, 16<<20))
 			fh.Close()
@@ -49,11 +52,14 @@ func (s *Server) addTorrent(w http.ResponseWriter, r *http.Request) error {
 			Link   string `json:"link"` // .torrent URL from a search result
 			Mode   string `json:"mode"`
 			Keep   *bool  `json:"keep"`
+			// Title is the catalog's (localized) name of what this release
+			// is, shown in the player instead of the file name.
+			Title string `json:"title"`
 		}
 		if err := readJSON(r, &b); err != nil {
 			return err
 		}
-		source, mode, link = b.Magnet, b.Mode, b.Link
+		source, mode, link, title = b.Magnet, b.Mode, b.Link, strings.TrimSpace(b.Title)
 		if b.Keep != nil {
 			keep = *b.Keep
 		}
@@ -81,6 +87,9 @@ func (s *Server) addTorrent(w http.ResponseWriter, r *http.Request) error {
 	hash, err := s.Torrents.Add(source, file, mode, keep)
 	if err != nil {
 		return badRequest("%v", err)
+	}
+	if title != "" {
+		_ = s.Store.SetSetting(torrentTitleKey(hash), title)
 	}
 	return writeJSON(w, map[string]string{"hash": hash})
 }
@@ -302,10 +311,7 @@ func (s *Server) torrentPlayback(ctx context.Context, hash string, idx int, caps
 		}
 	}
 	pb.TorrentFile = idx
-	pb.Title = name
-	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
-		pb.Title = name[i+1:]
-	}
+	pb.Title = s.torrentTitle(hash, name)
 	pb.Info = "Торрент · " + pb.Summary
 	return pb, nil
 }
@@ -470,3 +476,70 @@ func tail(s string, n int) string {
 }
 
 var _ = store.File{}
+
+func torrentTitleKey(hash string) string { return "torrentTitle:" + strings.ToLower(hash) }
+
+// torrentTitle is what the player shows for a torrent file: the catalog title
+// the release was added for, else a title parsed from the release name (a
+// Blu-ray's "BDMV/STREAM/00002.m2ts" says nothing), with "S1E2" for an
+// episode; the bare file name only when neither gives anything.
+func (s *Server) torrentTitle(hash, file string) string {
+	release := ""
+	if info, err := s.Torrents.Get(hash); err == nil {
+		release = info.Name
+	}
+	return titleForTorrent(s.Store.Setting(torrentTitleKey(hash), ""), release, file)
+}
+
+func titleForTorrent(known, release, file string) string {
+	file = strings.ReplaceAll(file, `\`, "/")
+	base := file[strings.LastIndex(file, "/")+1:]
+	full := file
+	if release != "" && !strings.HasPrefix(file, release+"/") && file != release {
+		full = release + "/" + file
+	}
+	p := parse.Parse(full)
+	if p.Kind == "episode" && p.Episode > 0 {
+		show := known
+		if show == "" {
+			show = p.Title
+		}
+		if show == "" {
+			show = parse.Parse(release + ".mkv").Title
+		}
+		if show != "" {
+			return fmt.Sprintf("%s · S%dE%d", show, p.Season, p.Episode)
+		}
+	}
+	if known != "" {
+		return known
+	}
+	// A movie: the release name is usually the best-named part.
+	for _, cand := range []string{release + ".mkv", full} {
+		if strings.TrimSuffix(cand, ".mkv") == "" {
+			continue
+		}
+		if t := parse.Parse(cand).Title; usefulTitle(t) {
+			return t
+		}
+	}
+	return base
+}
+
+// usefulTitle rejects what a parse of disc and camera names leaves behind:
+// "00002", "STREAM", "VTS 01 1".
+func usefulTitle(t string) bool {
+	if len([]rune(t)) < 2 {
+		return false
+	}
+	switch strings.ToUpper(t) {
+	case "STREAM", "BDMV", "VIDEO TS", "VIDEO_TS", "PLAYLIST":
+		return false
+	}
+	for _, r := range t {
+		if unicode.IsLetter(r) {
+			return !strings.HasPrefix(strings.ToUpper(t), "VTS ")
+		}
+	}
+	return false
+}

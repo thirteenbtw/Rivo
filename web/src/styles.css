@@ -191,6 +191,15 @@ html{background:var(--bg,#fff);--sb:color-mix(in srgb,var(--fg,#111214) 22%,tran
 .sel-dk{height:40px;padding:0 10px;border-radius:10px;background:#FFFFFF12;border:1px solid #FFFFFF26;color:#FFFFFF;font:500 calc(13px * var(--fs)) 'Inter',sans-serif;width:100%}
 .sel-dk option{color:#111214}
 input[type=range].rng{accent-color:var(--acc)}
+.pb-lg{width:48px;height:48px}
+.pb-lg:hover{background:#FFFFFF1F;color:#FFFFFF}
+.player .pl-track{height:4px;transition:height .15s}
+.player .pl-bar:hover .pl-track{height:6px}
+.player .pl-knob{width:12px;height:12px;transition:width .15s,height .15s}
+.player .pl-bar:hover .pl-knob{width:16px;height:16px}
+.player .pl-vol input{width:0;opacity:0;transition:width .2s,opacity .2s;margin:0}
+.player .pl-vol:hover input,.player .pl-vol:focus-within input{width:90px;opacity:1;margin:0 8px 0 2px}
+@media (max-width:720px){.player .pl-now,.player .pl-saved{display:none}}
 
 /* the rail scrolls instead of shrinking its buttons when it is taller than the window */
 .cols > nav > *{flex-shrink:0}
