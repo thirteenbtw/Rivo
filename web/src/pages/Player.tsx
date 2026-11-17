@@ -447,14 +447,14 @@ export default function Player() {
 
       {/* Top bar: close on the left, the (localized) title centered over the picture,
           the "position is saved" note on the right. */}
-      <header onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 96, display: 'grid', gridTemplateColumns: '1fr minmax(0, auto) 1fr', alignItems: 'start', gap: 16, padding: '20px 24px 40px', background: 'linear-gradient(#000000D9,#00000000)', opacity: showUI ? 1 : 0.001, transition: 'opacity .3s' }}>
+      <header onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 96, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)', alignItems: 'start', gap: 16, padding: '20px 24px 40px', background: 'linear-gradient(#000000D9,#00000000)', opacity: showUI ? 1 : 0.001, transition: 'opacity .3s' }}>
         <button className="pb pb-lg" onClick={close} aria-label={tr('Закрыть плеер', 'Close player')} style={{ justifySelf: 'start' }}><Icon name="close" size={26} /></button>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, textAlign: 'center', paddingTop: 4 }}>
           <h1 style={{ margin: 0, fontSize: 'calc(clamp(18px, 2.2vw, 28px) * var(--fs))', fontWeight: 800, letterSpacing: '-0.01em', lineHeight: 1.2, maxWidth: 'min(900px, calc(var(--vw) - 200px))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: '0 2px 12px #00000080' }}>{pb?.title || tr('Загрузка…', 'Loading…')}</h1>
           {pb && <span style={{ marginTop: 4, fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }} title={pb.reason}>{[pb.info || pb.summary, pb.encoder && pb.mode === 'hls' ? pb.encoder.toUpperCase() : ''].filter(Boolean).join(' · ')}</span>}
         </div>
         {(itemId > 0 || tfile >= 0) ? (
-          <span className="pl-saved" style={{ justifySelf: 'end', display: 'inline-flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', borderRadius: 999, background: '#FFFFFF1A', fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC', whiteSpace: 'nowrap' }}>
+          <span className="pl-saved" style={{ justifySelf: 'end', maxWidth: '100%', overflow: 'hidden', display: 'inline-flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', borderRadius: 999, background: '#FFFFFF1A', fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC', whiteSpace: 'nowrap' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3CCB7F' }} />{itemId ? tr('Позиция сохраняется · синхр. с ТВ', 'Position is saved · synced with TV') : tr('Позиция сохраняется', 'Position is saved')}
           </span>
         ) : <span />}
