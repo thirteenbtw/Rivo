@@ -53,7 +53,7 @@ export default function Player() {
   const [subIdx, setSubIdx] = useState<number>(() => Number(params.get('sub') ?? -1));
   const [cues, setCues] = useState<Cue[]>([]);
   const [subDelay, setSubDelay] = useState(0);
-  const [hover, setHover] = useState<{ x: number; t: number } | null>(null);
+  const [hover, setHover] = useState<{ f: number; t: number } | null>(null);
   const [idle, setIdle] = useState(false);
   const [next, setNext] = useState<Item | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -423,10 +423,12 @@ export default function Player() {
     try { await api.post(`/api/files/${fileId}/external?start=${Math.floor(cur)}`); video.current?.pause(); toast(tr('Открыто во внешнем плеере', 'Opened in external player')); } catch (e: any) { toast(e.message); }
   };
 
-  const barX = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Where on the bar the mouse is, as a fraction: clientX and the rect are in
+  // the same (unzoomed) units, so the ratio holds under the interface zoom.
+  const barAt = (e: React.MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const x = Math.max(0, Math.min(r.width, e.clientX - r.left));
-    return { x, t: (x / r.width) * duration };
+    const f = r.width ? Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) : 0;
+    return { f, t: f * duration };
   };
 
   return (
@@ -443,17 +445,19 @@ export default function Player() {
           and subtitles don't show until something else redraws. */}
       <div aria-hidden style={{ position: 'absolute', inset: 0, background: '#00000001', pointerEvents: 'none' }} />
 
-      <header onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 64, display: 'flex', alignItems: 'center', gap: 16, padding: '0 20px', background: 'linear-gradient(#000000E6,#00000000)', opacity: showUI ? 1 : 0.001, transition: 'opacity .3s' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <span style={{ fontSize: 'calc(14px * var(--fs))', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pb?.title || tr('Загрузка…', 'Loading…')}</span>
-          <span style={{ fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }} title={pb?.reason}>{pb ? [pb.info || pb.summary, pb.encoder && pb.mode === 'hls' ? pb.encoder.toUpperCase() : ''].filter(Boolean).join(' · ') : ''}</span>
+      {/* Top bar: close on the left, the (localized) title centered over the picture,
+          the "position is saved" note on the right. */}
+      <header onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, minHeight: 96, display: 'grid', gridTemplateColumns: '1fr minmax(0, auto) 1fr', alignItems: 'start', gap: 16, padding: '20px 24px 40px', background: 'linear-gradient(#000000D9,#00000000)', opacity: showUI ? 1 : 0.001, transition: 'opacity .3s' }}>
+        <button className="pb pb-lg" onClick={close} aria-label={tr('Закрыть плеер', 'Close player')} style={{ justifySelf: 'start' }}><Icon name="close" size={26} /></button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, textAlign: 'center', paddingTop: 4 }}>
+          <h1 style={{ margin: 0, fontSize: 'calc(clamp(18px, 2.2vw, 28px) * var(--fs))', fontWeight: 800, letterSpacing: '-0.01em', lineHeight: 1.2, maxWidth: 'min(900px, calc(var(--vw) - 200px))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: '0 2px 12px #00000080' }}>{pb?.title || tr('Загрузка…', 'Loading…')}</h1>
+          {pb && <span style={{ marginTop: 4, fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }} title={pb.reason}>{[pb.info || pb.summary, pb.encoder && pb.mode === 'hls' ? pb.encoder.toUpperCase() : ''].filter(Boolean).join(' · ')}</span>}
         </div>
-        {(itemId > 0 || tfile >= 0) && (
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', borderRadius: 999, background: '#FFFFFF1A', fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC', whiteSpace: 'nowrap' }}>
+        {(itemId > 0 || tfile >= 0) ? (
+          <span className="pl-saved" style={{ justifySelf: 'end', display: 'inline-flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px', borderRadius: 999, background: '#FFFFFF1A', fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC', whiteSpace: 'nowrap' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3CCB7F' }} />{itemId ? tr('Позиция сохраняется · синхр. с ТВ', 'Position is saved · synced with TV') : tr('Позиция сохраняется', 'Position is saved')}
           </span>
-        )}
-        <button className="pb" onClick={close} aria-label={tr('Закрыть плеер', 'Close player')} style={{ background: '#FFFFFF1A', marginLeft: itemId || tfile >= 0 ? 0 : 'auto', flex: 'none' }}><Icon name="close" size={18} /></button>
+        ) : <span />}
       </header>
 
       {(waiting || !pb) && !err && (
@@ -480,13 +484,13 @@ export default function Player() {
       )}
 
       {subNow && (
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: showUI ? 150 : 60, textAlign: 'center', pointerEvents: 'none', transition: 'bottom .3s', padding: '0 24px' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: showUI ? 170 : 60, textAlign: 'center', pointerEvents: 'none', transition: 'bottom .3s', padding: '0 24px' }}>
           <span style={{ display: 'inline-block', padding: '4px 10px', background: '#000000B3', fontSize: 'calc(clamp(18px,2.2vw,28px) * var(--fs))', fontWeight: 600, lineHeight: 1.35, whiteSpace: 'pre-line' }}>{subNow}</span>
         </div>
       )}
 
       {countdown !== null && next && (
-        <div style={{ position: 'absolute', right: 24, bottom: 120, width: 300, borderRadius: 16, background: '#FFFFFF', color: '#111214', padding: 16, display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 20px 60px #00000080' }}>
+        <div style={{ position: 'absolute', right: 24, bottom: 140, width: 300, borderRadius: 16, background: '#FFFFFF', color: '#111214', padding: 16, display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 20px 60px #00000080' }}>
           <div style={{ fontSize: 'calc(12px * var(--fs))', color: '#6B6F76' }}>{tr('Следующая серия через', 'Next episode in')} {countdown} {tr('с', 's')}</div>
           <div style={{ fontWeight: 700 }}>С{next.season}·Э{next.episode} {next.epTitle}</div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -497,7 +501,7 @@ export default function Player() {
       )}
 
       {panel && pb && (
-        <section aria-label={tr('Дорожки', 'Tracks')} style={{ position: 'absolute', right: 24, bottom: 108, width: 'min(340px, calc(var(--vw) - 48px))', maxHeight: 'calc(var(--vh) - 200px)', overflow: 'auto', borderRadius: 16, background: '#FFFFFF', color: '#111214', boxShadow: '0 20px 60px #00000080', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <section aria-label={tr('Дорожки', 'Tracks')} style={{ position: 'absolute', right: 24, bottom: 132, width: 'min(340px, calc(var(--vw) - 48px))', maxHeight: 'calc(var(--vh) - 200px)', overflow: 'auto', borderRadius: 16, background: '#FFFFFF', color: '#111214', boxShadow: '0 20px 60px #00000080', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div role="tablist" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 999, background: '#F2F2F0', marginBottom: 6 }}>
             {([['subs', tr('Субтитры', 'Subtitles')], ['audio', tr('Аудио', 'Audio')], ['speed', tr('Скорость', 'Speed')]] as const).map(([k, l]) => (
               <button key={k} role="tab" aria-selected={panel === k} onClick={() => setPanel(k)}
@@ -532,43 +536,54 @@ export default function Player() {
         </section>
       )}
 
-      <footer ref={controls} onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 20px', background: 'linear-gradient(#00000000,#000000E6 40%)', display: 'flex', flexDirection: 'column', gap: 8, opacity: showUI ? 1 : 0.001, transition: 'opacity .3s', paddingTop: 32 }}>
+      <footer ref={controls} onMouseEnter={() => { overBars.current = true; wake(); }} onMouseLeave={() => { overBars.current = false; wake(); }} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '48px 28px 18px', background: 'linear-gradient(#00000000,#000000D9 45%)', display: 'flex', flexDirection: 'column', gap: 10, opacity: showUI ? 1 : 0.001, transition: 'opacity .3s' }}>
         {stream && (
           <div style={{ display: 'flex', gap: 14, fontSize: 'calc(11px * var(--fs))', color: '#A9ADB4' }} className="mono">
             <span>{tr('Загружено', 'Downloaded')} {Math.round(stream.progress * 100)}%</span><span>↓ {fmtSize(stream.down)}/s</span><span>{stream.seeds} {tr('сидов', 'seeds')} · {stream.peers} {tr('пиров', 'peers')}</span>
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="mono" style={{ fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC', minWidth: 52 }}>{fmtTime(cur)}</span>
+        {/* Full-width progress with the time left on the right. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div role="slider" tabIndex={0} aria-label={tr('Позиция', 'Position')} aria-valuemin={0} aria-valuemax={Math.round(duration)} aria-valuenow={Math.round(cur)} aria-valuetext={fmtTime(cur)}
-            onMouseMove={(e) => setHover(barX(e))} onMouseLeave={() => setHover(null)} onClick={(e) => seek(barX(e).t)}
+            onMouseMove={(e) => setHover(barAt(e))} onMouseLeave={() => setHover(null)} onClick={(e) => seek(barAt(e).t)}
             onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.stopPropagation(); if (e.key === 'ArrowLeft') seek(cur - 5); if (e.key === 'ArrowRight') seek(cur + 5); }}
-            style={{ flex: 1, height: 16, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
-            <div style={{ position: 'relative', width: '100%', height: 4, borderRadius: 2, background: '#FFFFFF2E' }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, height: 4, width: `${bpct * 100}%`, borderRadius: 2, background: '#FFFFFF59' }} />
-              <div style={{ position: 'absolute', left: 0, top: 0, height: 4, width: `${pct * 100}%`, borderRadius: 2, background: 'var(--acc)' }} />
-              <div style={{ position: 'absolute', left: `${pct * 100}%`, top: -5, width: 14, height: 14, marginLeft: -7, borderRadius: '50%', background: '#FFFFFF' }} />
-              {hover && <div style={{ position: 'absolute', left: hover.x, bottom: 14, transform: 'translateX(-50%)', padding: '3px 8px', borderRadius: 6, background: '#FFFFFF', color: '#111214', fontSize: 'calc(11px * var(--fs))', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmtTime(hover.t)}</div>}
+            className="pl-bar" style={{ flex: 1, height: 20, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
+            <div className="pl-track" style={{ position: 'relative', width: '100%', borderRadius: 3, background: '#FFFFFF2E' }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${bpct * 100}%`, borderRadius: 3, background: '#FFFFFF59' }} />
+              {hover && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${hover.f * 100}%`, borderRadius: 3, background: '#FFFFFF40' }} />}
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct * 100}%`, borderRadius: 3, background: 'var(--acc)' }} />
+              <div className="pl-knob" style={{ position: 'absolute', left: `${pct * 100}%`, top: '50%', borderRadius: '50%', background: 'var(--acc)', transform: 'translate(-50%, -50%)', boxShadow: '0 0 0 3px #00000040' }} />
+              {/* Positioned in % of the track, not in px: the interface zoom
+                  (zoom.ts) scales px offsets but the mouse is measured unscaled,
+                  so a px left drifted further right the further along you hovered. */}
+              {hover && <div style={{ position: 'absolute', left: `${hover.f * 100}%`, bottom: 16, transform: 'translateX(-50%)', padding: '4px 9px', borderRadius: 8, background: '#FFFFFF', color: '#111214', fontSize: 'calc(12px * var(--fs))', fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none' }} className="mono">{fmtTime(hover.t)}</div>}
             </div>
           </div>
-          <span className="mono" style={{ fontSize: 'calc(12px * var(--fs))', color: '#D4D7DC', minWidth: 60, textAlign: 'right' }}>−{fmtTime(Math.max(0, duration - cur))}</span>
+          <span className="mono" style={{ fontSize: 'calc(14px * var(--fs))', color: '#E6E8EB', minWidth: 72, textAlign: 'right' }} title={`${fmtTime(cur)} / ${fmtTime(duration)}`}>−{fmtTime(Math.max(0, duration - cur))}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-          <button className="pb" onClick={toggle} aria-label={paused ? tr('Смотреть', 'Play') : tr('Пауза', 'Pause')}>{paused ? <PlayGlyph size={20} /> : <PauseGlyph size={20} />}</button>
-          <button className="pb" onClick={() => seek(cur - 10)} aria-label={tr('Назад 10 секунд', 'Back 10 seconds')}><Icon name="back10" /></button>
-          <button className="pb" onClick={() => seek(cur + 10)} aria-label={tr('Вперёд 10 секунд', 'Forward 10 seconds')}><Icon name="fwd10" /></button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button className="pb pb-lg" onClick={toggle} aria-label={paused ? tr('Смотреть', 'Play') : tr('Пауза', 'Pause')}>{paused ? <PlayGlyph size={26} /> : <PauseGlyph size={26} />}</button>
+          <button className="pb pb-lg" onClick={() => seek(cur - 10)} aria-label={tr('Назад 10 секунд', 'Back 10 seconds')}><Skip10 dir={-1} /></button>
+          <button className="pb pb-lg" onClick={() => seek(cur + 10)} aria-label={tr('Вперёд 10 секунд', 'Forward 10 seconds')}><Skip10 dir={1} /></button>
           {/* A TV has its own volume on the remote. */}
-          {!tv && <button className="pb" onClick={() => setMuted((m) => !m)} aria-label={muted ? tr('Включить звук', 'Unmute') : tr('Выключить звук', 'Mute')}><Icon name={muted || vol === 0 ? 'mute' : 'volume'} /></button>}
-          {!tv && <input type="range" className="rng" min={0} max={1} step={0.05} value={muted ? 0 : vol} aria-label={tr('Громкость', 'Volume')}
-            onChange={(e) => { setVol(Number(e.target.value)); setMuted(false); }} style={{ width: 80 }} />}
-          <span className="hk" style={{ marginLeft: 16, fontSize: 'calc(12px * var(--fs))', color: '#A9ADB4' }}>{tr('Пробел — пауза · ← → 10 с · F — экран · S — субтитры', 'Space — pause · ← → 10 s · F — fullscreen · S — subtitles')}</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-            {next && <button className="pb" onClick={goNext} aria-label={tr('Следующая серия', 'Next episode')} style={{ width: 'auto', padding: '0 12px', borderRadius: 999, font: "600 calc(12px * var(--fs)) 'Inter',sans-serif" }}>{tr('След. серия', 'Next')} ›</button>}
-            <button className="pb" onClick={() => setPanel(panel === 'speed' ? null : 'speed')} aria-label={tr('Скорость', 'Speed')} style={{ width: 'auto', padding: '0 10px', borderRadius: 999, font: "700 calc(12px * var(--fs)) 'Inter',sans-serif" }}>{speed}×</button>
-            <button className="pb" onClick={() => setPanel(panel && panel !== 'speed' ? null : 'subs')} aria-label={tr('Дорожки и субтитры', 'Tracks and subtitles')} aria-expanded={!!panel} style={{ background: panel ? '#FFFFFF2E' : undefined }}><Icon name="subs" /></button>
-            <button className="pb" onClick={castNow} aria-label={tr('Отправить на ТВ', 'Send to TV')}><Icon name="cast" /></button>
-            {state?.local && !hash && <button className="pb" onClick={external} aria-label={tr('Открыть во внешнем плеере', 'Open in external player')}><Icon name="external" /></button>}
-            {!tvApp() && <button className="pb" onClick={fullscreen} aria-label={tr('Во весь экран', 'Fullscreen')}><Icon name="fullscreen" /></button>}
+          {!tv && (
+            <div className="pl-vol" style={{ display: 'flex', alignItems: 'center' }}>
+              <button className="pb pb-lg" onClick={() => setMuted((m) => !m)} aria-label={muted ? tr('Включить звук', 'Unmute') : tr('Выключить звук', 'Mute')}><Icon name={muted || vol === 0 ? 'mute' : 'volume'} size={26} /></button>
+              <input type="range" className="rng" min={0} max={1} step={0.05} value={muted ? 0 : vol} aria-label={tr('Громкость', 'Volume')}
+                onChange={(e) => { setVol(Number(e.target.value)); setMuted(false); }} />
+            </div>
+          )}
+          <span className="mono pl-now" style={{ marginLeft: 10, fontSize: 'calc(13px * var(--fs))', color: '#A9ADB4' }}>{fmtTime(cur)} / {fmtTime(duration)}</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {next && <button className="pb" onClick={goNext} aria-label={tr('Следующая серия', 'Next episode')} style={{ width: 'auto', height: 44, padding: '0 14px', borderRadius: 999, background: '#FFFFFF1A', font: "600 calc(13px * var(--fs)) 'Inter',sans-serif" }}>{tr('След. серия', 'Next')} ›</button>}
+            <button className="pb pb-lg" onClick={() => setPanel(panel === 'subs' ? null : 'subs')} aria-label={tr('Субтитры', 'Subtitles')} aria-expanded={panel === 'subs'} style={{ background: panel === 'subs' ? '#FFFFFF2E' : undefined }}><Icon name="subs" size={26} /></button>
+            <button className="pb pb-lg" onClick={() => setPanel(panel === 'audio' || panel === 'speed' ? null : 'audio')} aria-label={tr('Настройки: звук и скорость', 'Settings: audio and speed')} aria-expanded={panel === 'audio' || panel === 'speed'} style={{ background: panel === 'audio' || panel === 'speed' ? '#FFFFFF2E' : undefined, position: 'relative' }}>
+              <Gear />
+              {speed !== 1 && <span style={{ position: 'absolute', right: 2, bottom: 4, padding: '0 4px', borderRadius: 6, background: 'var(--acc)', color: '#111214', font: "800 calc(9px * var(--fs))/14px 'Inter',sans-serif" }}>{speed}×</span>}
+            </button>
+            <button className="pb pb-lg" onClick={castNow} aria-label={tr('Отправить на ТВ', 'Send to TV')}><Icon name="cast" size={26} /></button>
+            {state?.local && !hash && <button className="pb pb-lg" onClick={external} aria-label={tr('Открыть во внешнем плеере', 'Open in external player')}><Icon name="external" size={24} /></button>}
+            {!tvApp() && <button className="pb pb-lg" onClick={fullscreen} aria-label={tr('Во весь экран', 'Fullscreen')}><Icon name="fullscreen" size={26} /></button>}
           </div>
         </div>
       </footer>
@@ -592,5 +607,26 @@ function Opt({ on, name, meta, onClick }: { on: boolean; name: string; meta?: st
         {meta && <span style={{ fontSize: 'calc(11px * var(--fs))', color: '#6B6F76' }}>{meta}</span>}
       </span>
     </button>
+  );
+}
+
+// 10-second skip: a circular arrow with "10" inside.
+function Skip10({ dir }: { dir: 1 | -1 }) {
+  const back = dir < 0;
+  return (
+    <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={back ? 'M4.5 12a7.5 7.5 0 1 0 2.3-5.4' : 'M19.5 12a7.5 7.5 0 1 1-2.3-5.4'} />
+      <path d={back ? 'M4.2 3.6v3.6h3.6' : 'M19.8 3.6v3.6h-3.6'} />
+      <text x="12" y="15.4" textAnchor="middle" fill="currentColor" stroke="none" fontSize="8" fontWeight="700" fontFamily="Inter, sans-serif">10</text>
+    </svg>
+  );
+}
+
+function Gear() {
+  return (
+    <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+    </svg>
   );
 }
