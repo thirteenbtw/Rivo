@@ -16,12 +16,15 @@ import Settings from './pages/Settings';
 import ProfilesPage from './pages/Profiles';
 import { Login, Setup } from './pages/Setup';
 import { tr } from './i18n';
+import { WindowCaption } from './components/WindowControls';
 
 function Gate() {
   const { state } = useApp();
-  if (!state) return <div className="loading" style={{ minHeight: 'var(--vh)' }}><span className="spin lg" /></div>;
-  if (state.authRequired) return <Login />;
-  if (!state.setupDone && state.local) return <Setup />;
+  // Screens before the shell have no title bar: a bare caption keeps the
+  // window movable and closable in the Windows app.
+  if (!state) return <><WindowCaption /><div className="loading" style={{ minHeight: 'var(--vh)' }}><span className="spin lg" /></div></>;
+  if (state.authRequired) return <><WindowCaption /><Login /></>;
+  if (!state.setupDone && state.local) return <><WindowCaption /><Setup /></>;
   return (
     <Routes>
       <Route element={<Shell />}>

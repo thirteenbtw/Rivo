@@ -6,6 +6,7 @@ import { Icon } from './Icon';
 import { CastDialog } from './CastDialog';
 import { MobileNav } from './MobileNav';
 import { TitleBar } from './TitleBar';
+import { PlayerWindowControls } from './WindowControls';
 import { Dots } from './Dots';
 import { PreviewLayer } from './Preview';
 import { installDragScroll } from './dragScroll';
@@ -101,6 +102,7 @@ export function Shell() {
           <MobileNav />
           <CastDialog />
           <PreviewLayer />
+          {loc.pathname.startsWith('/play') && <PlayerWindowControls />}
         </div>
       </div>
     </AmbientCtx.Provider>
