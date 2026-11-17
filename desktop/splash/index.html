@@ -10,10 +10,22 @@
   .orbit{transform-box:view-box;transform-origin:30px 36px;animation:orbit 2.4s cubic-bezier(.6,0,.4,1) infinite}
   @keyframes orbit{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion: reduce){.orbit{animation:none}}
+  /* No system title bar: a draggable strip with the window buttons. */
+  .bar{position:fixed;top:0;left:0;right:0;height:44px;display:flex;justify-content:flex-end;user-select:none}
+  .bar button{position:relative;width:46px;height:100%;border:0;padding:0;background:none;color:#BBC0D8;cursor:pointer;display:grid;place-items:center}
+  .bar button::before{content:'';position:absolute;left:5px;right:5px;top:5px;bottom:5px;border-radius:10px;transition:background .15s}
+  .bar button:hover{color:#fff}.bar button:hover::before{background:#252D51}
+  .bar button.x{width:52px;padding-right:6px}.bar button.x::before{right:11px}.bar button.x:hover::before{background:#E5484D}
+  .bar svg{position:relative;width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round}
   #e{max-width:420px;text-align:center;color:#FF8A90;display:none;font-weight:500}
 </style>
 </head>
 <body>
+<div class="bar" data-tauri-drag-region>
+  <button onclick="w('minimize')" aria-label="Свернуть"><svg viewBox="0 0 12 12"><path d="M2 6.5h8"/></svg></button>
+  <button onclick="w('toggle_maximize')" aria-label="Развернуть"><svg viewBox="0 0 12 12"><rect x="2.2" y="2.2" width="7.6" height="7.6" rx="1.8"/></svg></button>
+  <button class="x" onclick="w('close')" aria-label="Закрыть"><svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
+</div>
 <div class="b">
   <!-- Rivo loading mark: the spark orbits the ring -->
   <svg viewBox="0 0 64 64" width="72" height="72" role="img" aria-label="Загрузка"><circle cx="30" cy="36" r="16" fill="none" stroke="#A5B4FC" stroke-width="9"/><g class="orbit"><rect x="44" y="6" width="12" height="12" rx="2" fill="#8EDCC8" transform="rotate(45 50 12)"/></g></svg>
@@ -21,6 +33,7 @@
   <div id="e"></div>
 </div>
 <script>
+  const w = (cmd) => window.__TAURI_INTERNALS__?.invoke('plugin:window|' + cmd);
   // The shell navigates this window to the local server once it is ready.
   window.addEventListener('hc-error', (e) => { const el = document.getElementById('e'); el.textContent = e.detail; el.style.display = 'block'; });
 </script>

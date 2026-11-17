@@ -118,6 +118,32 @@ html{scroll-padding-top:calc(var(--tb) + 12px)}
 @keyframes tbpulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--mint) 65%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
 /* the bar gives way before the page does: first the name of the section, then
    the wordmark (the mark stays — it is the way home), then the columns stack */
+.titlebar.tb-shell{padding-right:0;user-select:none;-webkit-user-select:none}
+/* Window controls (Windows app only). Each button is the full bar height and
+   the last one touches the window edge; the visible chip sits inside it. */
+.wc{display:flex;align-self:stretch;flex:none;margin-left:4px}
+.wc-b{position:relative;width:46px;height:100%;border:0;padding:0;background:transparent;color:var(--mut2,#61677E);cursor:pointer;display:grid;place-items:center;outline:none}
+.wc-b::before{content:'';position:absolute;inset:50% 5px auto;height:34px;transform:translateY(-50%);border-radius:10px;background:transparent;transition:background .15s,box-shadow .15s}
+.wc-b svg{position:relative;width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.wc-b:hover{color:var(--fg,#141A33)}
+.wc-b:hover::before{background:var(--chip,#8890B033)}
+.wc-b:active::before{background:var(--line2,#8890B055)}
+.wc-b:active svg{transform:scale(.88)}
+.wc-x{width:52px;padding-right:6px}
+.wc-x::before{right:11px}
+.wc-x:hover{color:#FFFFFF}
+.wc-x:hover::before{background:#E5484D;box-shadow:0 6px 16px -6px #E5484D}
+.wc-x:active::before{background:#C9343A}
+.wc-dark .wc-b{color:#D4D7DC}
+.wc-dark .wc-b:hover{color:#FFFFFF}
+.wc-dark .wc-b:hover::before{background:#FFFFFF24}
+.wc-dark .wc-b:active::before{background:#FFFFFF33}
+.wc-dark .wc-x:hover::before{background:#E5484D}
+.wc-cap{position:fixed;top:0;left:0;right:0;height:44px;z-index:60;display:flex;justify-content:flex-end}
+.wc-cap .wc-b{color:#8A90AA}
+.wc-float{position:fixed;top:0;right:0;height:44px;z-index:45;display:flex;transition:opacity .3s}
+.wc-float.off{opacity:0;pointer-events:none}
+.app:has(.wc-float) .player>header{padding-top:44px!important}
 @media (max-width:1000px){.tb-where,.tb-sep{display:none}.tb-live-t{display:none}.tb-live{padding:0 9px}}
 @media (max-width:860px){.tb-brand .wm{display:none}}
 @media (max-width:760px){

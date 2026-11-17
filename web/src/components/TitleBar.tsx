@@ -4,6 +4,8 @@ import { useApp } from '../state';
 import { t, tr } from '../i18n';
 import { Icon } from './Icon';
 import { AppMark, Wordmark } from './Brand';
+import { WindowControls } from './WindowControls';
+import { inShell } from '../win';
 
 // The app's title bar: one strip that spans the window and stays above the
 // page — the mark and the wordmark, back and forward, where you are, the
@@ -72,7 +74,10 @@ export function TitleBar({ catalog, types, home = false }: { catalog: boolean; t
   };
 
   return (
-    <header className={'titlebar' + (scrolled ? ' on' : '') + (home ? ' tb-home' : '')}>
+    // In the Windows app the bar is also the window's caption: drag it to move
+    // or snap the window, double-click it to maximize; buttons, links and the
+    // search keep working as usual.
+    <header className={'titlebar' + (scrolled ? ' on' : '') + (home ? ' tb-home' : '') + (inShell() ? ' tb-shell' : '')} data-tauri-drag-region="deep">
       <div className="tb-left">
         <Link to="/" className="tb-brand" aria-label="Rivo">
           <AppMark size={26} />
@@ -85,7 +90,7 @@ export function TitleBar({ catalog, types, home = false }: { catalog: boolean; t
         <span className="tb-sep" aria-hidden="true" />
         <span className="tb-where" title={where}>{where}</span>
       </div>
-      <form role="search" className="tb-search" onSubmit={(e) => { e.preventDefault(); go(); }}>
+      <form role="search" className="tb-search" data-tauri-drag-region="false" onSubmit={(e) => { e.preventDefault(); go(); }}>
         <Icon name="search" size={17} />
         <label className="sr" htmlFor="q">{tr('Поиск', 'Search')}</label>
         <input id="q" ref={input} value={q} onChange={(e) => { typed.current = true; setQ(e.target.value); }}
@@ -114,6 +119,7 @@ export function TitleBar({ catalog, types, home = false }: { catalog: boolean; t
           <Icon name="sparkle" size={17} />
         </button>
       </div>
+      <WindowControls />
     </header>
   );
 }

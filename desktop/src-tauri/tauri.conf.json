@@ -18,6 +18,8 @@
         "minHeight": 600,
         "center": true,
         "dragDropEnabled": false,
+        "decorations": false,
+        "shadow": true,
         "backgroundColor": "#141A33"
       }
     ],
