@@ -73,6 +73,25 @@ fn splash_error(app: &AppHandle, msg: &str) {
     }
 }
 
+/// Says in words why the media server stopped. Windows reports a failed start
+/// as an NTSTATUS in the exit code, which means nothing as a bare number.
+fn exit_message(code: Option<i32>) -> String {
+    const LOGS: &str = "Журнал: %APPDATA%\\HomeCinema\\logs";
+    let why = match code.map(|c| c as u32) {
+        Some(0xC000_0135) => "Windows не нашёл библиотеку (DLL), без которой он не запускается. Переустановите Rivo с последней версии установщика.".to_string(),
+        Some(0xC000_007B) => "файлы программы повреждены или от другой разрядности Windows. Переустановите Rivo.".to_string(),
+        Some(0xC000_0142) => "Windows не смог его инициализировать. Перезагрузите компьютер и запустите Rivo снова.".to_string(),
+        Some(0xC000_0005) => "он аварийно завершился (ошибка доступа к памяти).".to_string(),
+        Some(0xC000_0409) => "он аварийно завершился.".to_string(),
+        Some(0xC000_013A) => "его закрыли.".to_string(),
+        Some(c) if c >= 0xC000_0000 => format!("он аварийно завершился (код 0x{c:08X})."),
+        Some(0) => "он неожиданно завершил работу.".to_string(),
+        Some(c) => format!("он завершился с ошибкой (код {c})."),
+        None => "его процесс был закрыт извне (например, антивирусом или Диспетчером задач).".to_string(),
+    };
+    format!("Медиасервер остановился: {why} {LOGS}")
+}
+
 fn start_server(app: &AppHandle) -> Result<(), String> {
     let cmd = app
         .shell()
@@ -99,10 +118,7 @@ fn start_server(app: &AppHandle) -> Result<(), String> {
                 }
                 CommandEvent::Terminated(p) => {
                     *app.state::<Server>().base.lock().unwrap() = None;
-                    splash_error(
-                        &app,
-                        &format!("Медиасервер остановился (код {:?}). Журнал: %APPDATA%\\HomeCinema\\logs", p.code),
-                    );
+                    splash_error(&app, &exit_message(p.code));
                     break;
                 }
                 _ => {}

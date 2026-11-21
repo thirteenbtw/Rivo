@@ -186,7 +186,11 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           [[ "$GITHUB_REF" == refs/tags/* ]] || VERSION="0.1.0-${GITHUB_SHA::7}"
           mkdir -p ../desktop/src-tauri/binaries
-          go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o ../desktop/src-tauri/binaries/rivo-server-$TRIPLE.exe ./cmd/homecinema
+          # The runner has MinGW, so cgo would be on and the torrent library's
+          # C++ uTP and SQLite parts would link MinGW DLLs that a normal PC
+          # does not have (the server then dies with 0xC0000135). Pure Go, as
+          # on Android: uTP is off anyway and SQLite has a pure Go driver.
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o ../desktop/src-tauri/binaries/rivo-server-$TRIPLE.exe ./cmd/homecinema
 
       - name: Fetch FFmpeg (LGPL build)
         shell: bash
@@ -205,6 +209,10 @@ jobs:
           cp "$BIN/ffmpeg.exe" desktop/src-tauri/binaries/ffmpeg-$TRIPLE.exe
           cp "$BIN/ffprobe.exe" desktop/src-tauri/binaries/ffprobe-$TRIPLE.exe
           cp "$(dirname "$BIN")/LICENSE.txt" desktop/src-tauri/FFMPEG-LICENSE.txt || true
+
+      - name: Check the bundled programs need only Windows DLLs
+        shell: bash
+        run: go run tools/windows-dlls/main.go desktop/src-tauri/binaries/*.exe
 
       - name: Build installer
         working-directory: desktop
